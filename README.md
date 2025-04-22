@@ -1,1 +1,33 @@
-----------------------------------NotasDelProyecto--------------------------------------
+# Sistema de Información para la Gestión Integral de Hoteles y Cuartos de Alquiler  
+
+**Plataforma web para gestionar reservas de alojamientos en Puno, Perú.**  
+*Segmentada para turistas y estudiantes, con enfoque en seguridad y experiencia de usuario.*  
+
+---
+
+## 🚀 **Funcionalidades Clave**  
+- 🔒 Autenticación de dos factores y roles diferenciados (turista/estudiante).  
+- 🌍 Metabuscador con filtros de ubicación, precios y zonas seguras (integración de Google Maps API).  
+- 📊 Dashboard administrativo para monitoreo de reservas y reportes estadísticos.  
+- ⭐ Sistema de reseñas y calificaciones para alojamientos.  
+- 📱 Interfaz responsive compatible con dispositivos móviles.  
+
+---
+
+## 🛠️ **Tecnologías Utilizadas**  
+| **Categoría**       | **Herramientas**                                                                 |  
+|----------------------|---------------------------------------------------------------------------------|  
+| **Frontend**         | Flutter, (para módulos administrativos)                                |  
+| **Backend**          | Supabase,                                                     |  
+| **Base de Datos**    | PostgreSQL                                                                      |  
+| **Despliegue**       | Docker                                                                          |  
+| **Diseño UI/UX**     | Figma                                                                           |  
+| **Gestión Ágil**     | Trello, Discord, GitHub, Notion, OneDrive                                      |  
+
+---
+
+## 📦 **Instalación y Ejecución**  
+
+### **Prerrequisitos**  
+- Flutter 3.13+  
+- Docker 24.0+ 
