@@ -31,3 +31,9 @@
 ### **Prerrequisitos**  
 - Flutter 3.13+  
 - Docker 24.0+ 
+
+
+------------------------------Tareas------------------------------------
+- backend 
+- login con gmail
+- interfaz de usuario/dueño
