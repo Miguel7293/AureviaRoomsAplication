@@ -1,5 +1,6 @@
 // lib/presentation/screens/user/main_user_screen.dart
 import 'package:flutter/material.dart';
+import 'package:aureviarooms/presentation/screens/user/profile_screen.dart';
 import 'package:aureviarooms/presentation/navigation/user_main_bar.dart';
 import 'package:aureviarooms/data/models/hotel.dart';
 import 'package:aureviarooms/data/services/hotel_service.dart';
@@ -45,7 +46,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
       case 3:
         return const Center(child: Text('Bookings'));
       case 4:
-        return const Center(child: Text('Profile'));
+        return ProfileScreen();
       default:
         return HomeTab(hotelService: _hotelService);
     }
