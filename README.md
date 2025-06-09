@@ -37,3 +37,9 @@
 - backend 
 - login con gmail
 - interfaz de usuario/dueño
+-----------------------------------------------------
+generen su Sha-1
+.\gradlew.bat signingReport desde la carpeta android
+
+cambien la direccion...
+-------------------------

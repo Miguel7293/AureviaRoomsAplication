@@ -1,7 +1,5 @@
 // lib/presentation/screens/user/main_user_screen.dart
 import 'package:flutter/material.dart';
-import 'package:aureviarooms/presentation/screens/user/profile_screen.dart';
-import 'package:aureviarooms/presentation/navigation/user_main_bar.dart';
 import 'package:aureviarooms/data/models/hotel.dart';
 import 'package:aureviarooms/data/services/hotel_service.dart';
 
@@ -13,43 +11,34 @@ class MainUserScreen extends StatefulWidget {
 }
 
 class _MainUserScreenState extends State<MainUserScreen> {
-  int _currentIndex = 0;
-  final HotelService _hotelService = HotelService(); // Instancia del servicio
-
+  final HotelService _hotelService = HotelService();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AureviaRooms'),
         elevation: 0,
+        backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        title: Align(
+          alignment: Alignment.centerLeft,
+          child: Image.asset(
+            'assets/Logo_Nombre.png',
+            height: 40,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Text(
+              'AureviaRooms',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+          ),
+        ),
       ),
-      body: _buildBody(),
-      bottomNavigationBar: UserMainBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
+      body: HomeTab(hotelService: _hotelService),
     );
-  }
-
-  Widget _buildBody() {
-    switch (_currentIndex) {
-      case 0:
-        return HomeTab(hotelService: _hotelService); // Pasar el servicio
-      case 1:
-        return const Center(child: Text('Explore'));
-      case 2:
-        return const Center(child: Text('Saved'));
-      case 3:
-        return const Center(child: Text('Bookings'));
-      case 4:
-        return ProfileScreen();
-      default:
-        return HomeTab(hotelService: _hotelService);
-    }
   }
 }
 
