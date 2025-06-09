@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:aureviarooms/data/models/hotel.dart';
 import 'package:aureviarooms/data/services/hotel_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileOwnerScreen extends StatelessWidget {
   final HotelService _hotelService;
 
-  ProfileScreen({super.key}) : _hotelService = HotelService();
+  ProfileOwnerScreen({super.key}) : _hotelService = HotelService();
 
   @override
   Widget build(BuildContext context) {
