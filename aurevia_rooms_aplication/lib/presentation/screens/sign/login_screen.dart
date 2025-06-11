@@ -1,8 +1,7 @@
-// ignore_for_file: use_build_context_synchronously
-
+// archivo: login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../provider/auth_provider.dart';
+import 'package:aureviarooms/provider/auth_provider.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -10,32 +9,44 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
 
     return Scaffold(
       body: Center(
-        child: ValueListenableBuilder<bool>(
-          valueListenable: isLoading,
-          builder: (context, loading, _) {
-            return loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton.icon(
-                    icon: const Icon(Icons.login),
-                    label: const Text('Iniciar sesión con Google'),
-                    onPressed: () async {
-                      isLoading.value = true;
-                      try {
-                        await authProvider.loginWithGoogle();
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e')),
-                        );
-                      } finally {
-                        isLoading.value = false;
-                      }
-                    },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Bienvenido a AureviaRooms',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await authProvider.loginWithGoogle();
+
+                  if (!context.mounted) return;
+
+                  if (authProvider.isAuthenticated) {
+                    Navigator.pushReplacementNamed(context, '/home');
+                  }
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
                   );
-          },
+                }
+              }
+              ,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text('Ingresar con Google'),
+            ),
+          ],
         ),
       ),
     );
