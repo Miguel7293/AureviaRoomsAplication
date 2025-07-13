@@ -14,62 +14,68 @@ class AppTheme {
         ),
       );
 
-  static ThemeData get lightModernTheme => ThemeData(
-        primaryColor: const Color(0xFF4FC3F7), // Light blue
+  static ThemeData get darkFuturisticTheme => ThemeData(
+        primaryColor: Colors.cyanAccent,
         scaffoldBackgroundColor: Colors.transparent,
         appBarTheme: AppBarTheme(
-          backgroundColor: const Color(0xFFFFFFFF), // White
-          elevation: 2,
+          backgroundColor: Colors.black.withOpacity(0.3),
+          elevation: 0,
           titleTextStyle: const TextStyle(
-            color: Color(0xFF333333), // Dark gray
-            fontSize: 24,
+            color: Colors.white,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
-            fontFamily: null, // Default font
+            fontFamily: 'Roboto',
           ),
         ),
         cardTheme: CardTheme(
-          color: const Color(0xFFFFFFFF), // White
-          elevation: 2,
+          color: Colors.white.withOpacity(0.1),
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: const Color(0xFF4FC3F7).withOpacity(0.3), width: 1),
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.cyanAccent.withOpacity(0.5), width: 1),
           ),
         ),
         textTheme: const TextTheme(
           bodyMedium: TextStyle(
-            color: Color(0xFF333333), // Dark gray
-            fontFamily: null, // Default font
+            color: Colors.white,
+            fontFamily: 'Roboto',
             fontSize: 16,
+            shadows: [
+              Shadow(
+                color: Colors.black54,
+                offset: Offset(1, 1),
+                blurRadius: 2,
+              ),
+            ],
           ),
           titleLarge: TextStyle(
-            color: Color(0xFF333333), // Dark gray
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
-            fontFamily: null, // Default font
+            fontSize: 18,
+            fontFamily: 'Roboto',
           ),
           labelSmall: TextStyle(
-            color: Color(0xFF4FC3F7), // Light blue
+            color: Colors.cyanAccent,
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            fontFamily: null, // Default font
+            fontFamily: 'Roboto',
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(const Color(0xFF4FC3F7).withOpacity(0.2)),
-            foregroundColor: WidgetStateProperty.all(const Color(0xFF333333)),
-            overlayColor: WidgetStateProperty.all(const Color(0xFF4FC3F7).withOpacity(0.3)),
+            backgroundColor: WidgetStateProperty.all(Colors.cyanAccent.withOpacity(0.2)),
+            foregroundColor: WidgetStateProperty.all(Colors.white),
+            overlayColor: WidgetStateProperty.all(Colors.cyanAccent.withOpacity(0.3)),
             shape: WidgetStateProperty.all(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
           ),
         ),
         progressIndicatorTheme: const ProgressIndicatorThemeData(
-          color: Color(0xFF4FC3F7), // Light blue
+          color: Colors.cyanAccent,
         ),
         iconTheme: const IconThemeData(
-          color: Color(0xFF333333), // Dark gray
+          color: Colors.white,
           size: 48,
         ),
       );

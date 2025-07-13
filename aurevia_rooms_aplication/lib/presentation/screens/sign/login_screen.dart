@@ -28,7 +28,7 @@ class LoginScreen extends StatelessWidget {
                   if (!context.mounted) return;
 
                   if (authProvider.isAuthenticated) {
-                    Navigator.pushReplacementNamed(context, '/home');
+                    Navigator.pushReplacementNamed(context, '/booking-tests');
                   }
                 } catch (e) {
                   if (!context.mounted) return;

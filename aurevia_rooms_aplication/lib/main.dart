@@ -1,12 +1,13 @@
-// archivo: main.dart
+import 'package:aureviarooms/data/services/booking_repository.dart';
+import 'package:aureviarooms/data/services/stay_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-
-import 'app/app.dart';
-import 'config/supabase/supabase_config.dart';
-import 'provider/auth_provider.dart';
-import 'provider/connection_provider.dart';
+import 'package:aureviarooms/data/services/local_storage_manager.dart';
+import 'package:aureviarooms/app/app.dart';
+import 'package:aureviarooms/config/supabase/supabase_config.dart';
+import 'package:aureviarooms/provider/auth_provider.dart';
+import 'package:aureviarooms/provider/connection_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,19 @@ void main() async {
             previous?.updateConnection(connection);
             return previous!;
           },
+        ),
+        Provider(create: (_) => LocalStorageManager()),
+        Provider(
+          create: (context) => BookingRepository(
+            context.read<ConnectionProvider>(),
+            context.read<LocalStorageManager>(),
+          ),
+        ),
+        Provider(
+          create: (context) => StayRepository(
+            context.read<ConnectionProvider>(),
+            context.read<LocalStorageManager>(),
+          ),
         ),
       ],
       child: const App(),

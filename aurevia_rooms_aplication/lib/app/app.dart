@@ -1,7 +1,8 @@
+import 'package:aureviarooms/trash/checking_booking_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/core/theme/app_theme.dart';
-import 'package:aureviarooms/presentation/navigation/user_nav_bar.dart';
+import 'package:aureviarooms/presentation/navigation/owner_nav_bar.dart';
 import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
 
@@ -17,11 +18,13 @@ class App extends StatelessWidget {
       title: 'AureviaRooms',
       theme: AppTheme.lightTheme,
       home: authProvider.isAuthenticated
-          ? const UserNavBar()
+          ? const MainOwnerScreen()
           : const LoginScreen(),
       routes: {
+        '/booking-tests': (context) => const BookingTestScreen(),
         '/login': (context) => const LoginScreen(),
-        '/home': (context) => const UserNavBar(),
+        '/home': (context) => const MainOwnerScreen(),
+        
       },
     );
   }
