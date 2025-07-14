@@ -18,14 +18,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code related (Uncomment to ignore VS Code settings)
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
-**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -33,16 +30,55 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Android specific
+/android/.gradle/
+/android/build/                     # Ignora la carpeta build de Android en la raíz del módulo
+/android/app/build/                 # Ignora la carpeta build de la aplicación Android
+/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java # Ignora el generador de plugins de Android
+/android/local.properties
+/android/key.properties
+/android/*.jks
+/android/captures/
+
+# iOS specific
+/ios/Flutter/.last_build_id
+/ios/.symlinks/
+/ios/Runner.xcworkspace/
+/ios/build/                         # Ignora la carpeta build de iOS
+/ios/.generated/
+/ios/Pods/                          # Ignora la carpeta de CocoaPods
+/ios/.plugin_symlinks/
+/ios/Flutter/Generated.xcconfig
+/ios/Runner/*.pbxuser
+/ios/Runner/*.mode1v3
+/ios/Runner/*.xcscheme
+/ios/Runner/GeneratedPluginRegistrant.h # Ignora el generador de plugins de iOS (Header)
+/ios/Runner/GeneratedPluginRegistrant.m # Ignora el generador de plugins de iOS (Objective-C)
+/ios/Runner/GeneratedPluginRegistrant.swift # Ignora el generador de plugins de iOS (Swift)
+
+
+# Linux specific
+/linux/build/                       # Ignora la carpeta build de Linux
+/linux/flutter/generated_plugin_registrant.cc # Ignora el generador de plugins de Linux (C++)
+/linux/flutter/generated_plugin_registrant.h  # Ignora el generador de plugins de Linux (Header)
+/linux/flutter/generated_plugins.cmake        # Ignora los archivos cmake generados para plugins
+
+# Windows specific
+/windows/build/                     # Ignora la carpeta build de Windows
+/windows/flutter/generated_plugin_registrant.cc # Ignora el generador de plugins de Windows (C++)
+/windows/flutter/generated_plugin_registrant.h  # Ignora el generador de plugins de Windows (Header)
+/windows/flutter/generated_plugins.cmake        # Ignora los archivos cmake generados para plugins
+
+# macOS specific
+/macos/build/                       # Ignora la carpeta build de macOS
+/macos/Flutter/GeneratedPluginRegistrant.swift # Ignora el generador de plugins de macOS (Swift)
+/macos/Flutter/GeneratedPluginRegistrant.h     # Ignora el generador de plugins de macOS (Header)
+
 # Symbolication related
 app.*.symbols
 
 # Obfuscation related
 app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
 
 # Environment files
 .env
