@@ -147,18 +147,63 @@ class StayRepository {
     }
   }
 
+  // --- NUEVO MÉTODO A AÑADIR ---
+  Future<List<Stay>> getAllPublishedStays() async {
+    if (!await _connectionProvider.isConnected) {
+      // Puedes optar por devolver una lista vacía, una caché genérica o lanzar una excepción.
+      // Por simplicidad, y para esta vista, si no hay conexión, devolvemos lo que hay en caché genérica.
+      debugPrint('No hay conexión a internet, intentando obtener alojamientos publicados de la caché general.');
+      // Ojo: _getCachedStays() devuelve TODOS los stays cacheados, no solo los publicados.
+      // Para un comportamiento 100% correcto offline de "solo publicados", necesitarías
+      // una caché específica para "todos los publicados". Por ahora, es un compromiso.
+      return (await _getCachedStays()).where((s) => s.status == 'published').toList();
+    }
+
+    try {
+      final response = await _retryOptions.retry(
+        () => _client
+            .from('stays')
+            .select() // Select all columns
+            .eq('status', 'published'), // Filter by 'published' status
+      );
+
+      debugPrint('Supabase response for published stays: ${response.runtimeType}, content: $response');
+      if (response is! List) {
+        throw Exception('Expected List response for published stays, got ${response.runtimeType}');
+      }
+
+      final stays = response.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic> in published stays, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
+
+      // Opcional: Podrías querer cachear estos 'published stays' por separado si la lista es muy grande
+      // y quieres un acceso offline muy específico a "todos los publicados".
+      // Por ahora, el _cacheStay individual y _getCachedStays general son suficientes.
+      return stays;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo todos los alojamientos publicados: $e');
+      // Propagar el error para que el FutureBuilder en la UI lo maneje.
+      rethrow;
+    }
+  }
+  // --- FIN DEL NUEVO MÉTODO ---
+
+
   // Caché methods
   Future<void> _cacheStay(Stay stay) async {
     final prefs = await SharedPreferences.getInstance();
     final stays = await _getCachedStays();
     final index = stays.indexWhere((s) => s.stayId == stay.stayId);
-    
+
     if (index != -1) {
       stays[index] = stay;
     } else {
       stays.add(stay);
     }
-    
+
     await prefs.setString('cached_stays', jsonEncode(stays.map((s) => s.toJson()).toList()));
   }
 
@@ -174,7 +219,7 @@ class StayRepository {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('cached_stays');
       if (data == null) return [];
-      
+
       final decoded = jsonDecode(data);
       if (decoded is! List) {
         debugPrint('⚠️ Cached stays data is not a List: $decoded');
@@ -210,7 +255,7 @@ class StayRepository {
         debugPrint('No cached data for ownerId: $ownerId');
         return [];
       }
-      
+
       final decoded = jsonDecode(data);
       if (decoded is! List) {
         debugPrint('⚠️ Cached owner stays data is not a List: $decoded');
@@ -238,7 +283,7 @@ class StayRepository {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('search_stays_${query.toLowerCase()}');
       if (data == null) return [];
-      
+
       final decoded = jsonDecode(data);
       if (decoded is! List) {
         debugPrint('⚠️ Cached search results data is not a List: $decoded');

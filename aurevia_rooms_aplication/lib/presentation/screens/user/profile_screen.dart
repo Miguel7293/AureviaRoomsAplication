@@ -1,14 +1,46 @@
+import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/models/hotel.dart';
 import 'package:aureviarooms/data/services/hotel_service.dart';
+import 'package:aureviarooms/provider/auth_provider.dart'; // Importar AuthProvider
+import 'package:aureviarooms/data/models/user_model.dart'; // Importar UserModel
 
-class ProfileScreen extends StatelessWidget {
-  final HotelService _hotelService;
+class ProfileScreen extends StatefulWidget { // Cambiado a StatefulWidget
+  const ProfileScreen({super.key});
 
-  ProfileScreen({super.key}) : _hotelService = HotelService();
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final HotelService _hotelService = HotelService();
+
+  // Colores de la marca (azul oscuro y dorado)
+  static const Color primaryBlue = Color(0xFF2A3A5B); // Azul oscuro del logo
+  static const Color accentGold = Color(0xFFD4AF37); // Dorado/Mostaza del logo
+  static const Color textColorLight = Colors.white; // Texto blanco para contraste
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final UserModel? currentUser = authProvider.appUser;
+
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Image.asset(
+            'assets/Logo_Nombre.png',
+            height: 40,
+            fit: BoxFit.contain,
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -35,22 +67,25 @@ class ProfileScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildProfileHeader(),
+            _buildProfileHeader(currentUser),
             const SizedBox(height: 16),
             _buildFavoritesSection(context),
             const SizedBox(height: 24),
-            _buildProfileSection(context),
+            _buildProfileSection(context, authProvider),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(UserModel user) {
+    final String profileImageUrl = user.profileImageUrl ??
+        'https://via.placeholder.com/150/0000FF/FFFFFF?text=AU';
+
     return Container(
       padding: const EdgeInsets.only(top: 60, bottom: 30),
       decoration: BoxDecoration(
-        color: Colors.blue[700],
+        color: primaryBlue,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
@@ -61,39 +96,40 @@ class ProfileScreen extends StatelessWidget {
           Stack(
             alignment: Alignment.bottomRight,
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 60,
-                backgroundImage: NetworkImage(
-                  'https://img.freepik.com/premium-photo/woman-smiling-camera_777078-50901.jpg',
-                ),
+                backgroundImage: NetworkImage(profileImageUrl),
+                onBackgroundImageError: (exception, stackTrace) {
+                  debugPrint('Error loading profile image: $exception');
+                },
               ),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: textColorLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.edit,
                   size: 20,
-                  color: Colors.blue,
+                  color: primaryBlue,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Maria Dev',
-            style: TextStyle(
+          Text(
+            user.username,
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: textColorLight,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'eMILYdevMar@email.com',
-            style: TextStyle(
+          Text(
+            user.email,
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 16,
             ),
@@ -115,9 +151,9 @@ class ProfileScreen extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: Text('Error loading favorites')),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(child: Text('Error al cargar favoritos: ${snapshot.error}')),
           );
         }
 
@@ -128,11 +164,12 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Favorite Hotels',
+              Text(
+                'Hoteles Favoritos',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
+                  color: primaryBlue,
                 ),
               ),
               const SizedBox(height: 16),
@@ -153,51 +190,61 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileSection(BuildContext context) {
+  Widget _buildProfileSection(BuildContext context, AuthProvider authProvider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
           _buildProfileCard(
             context,
-            title: 'Account Settings',
+            title: 'Configuración de Cuenta',
             options: [
               _buildProfileOption(
                 icon: Icons.person_outline,
-                title: 'Personal Information',
-                onTap: () {},
+                title: 'Información Personal',
+                onTap: () {
+                  // TODO: Implementar navegación a edición de perfil
+                },
               ),
               _buildProfileOption(
                 icon: Icons.lock_outline,
-                title: 'Password & Security',
-                onTap: () {},
+                title: 'Contraseña y Seguridad',
+                onTap: () {
+                  // TODO: Implementar navegación a seguridad
+                },
               ),
               _buildProfileOption(
                 icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                onTap: () {},
+                title: 'Notificaciones',
+                onTap: () {
+                  // TODO: Implementar navegación a notificaciones
+                },
               ),
             ],
           ),
           const SizedBox(height: 20),
           _buildProfileCard(
             context,
-            title: 'App Settings',
+            title: 'Configuración de la Aplicación',
             options: [
               _buildProfileOption(
                 icon: Icons.language_outlined,
-                title: 'Language',
+                title: 'Idioma',
                 onTap: () {},
-                trailing: const Text('English'),
+                trailing: const Text('Español'),
               ),
               _buildProfileOption(
                 icon: Icons.dark_mode_outlined,
-                title: 'Dark Mode',
-                onTap: () {},
+                title: 'Modo Oscuro',
+                onTap: () {
+                  // TODO: Implementar lógica de cambio de tema
+                },
                 trailing: Switch(
                   value: false,
-                  onChanged: (val) {},
-                  activeColor: Colors.blue,
+                  onChanged: (val) {
+                    // TODO: Implementar cambio de modo oscuro
+                  },
+                  activeColor: accentGold,
                 ),
               ),
             ],
@@ -205,17 +252,21 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _buildProfileCard(
             context,
-            title: 'Support',
+            title: 'Soporte',
             options: [
               _buildProfileOption(
                 icon: Icons.help_outline,
-                title: 'Help Center',
-                onTap: () {},
+                title: 'Centro de Ayuda',
+                onTap: () {
+                  // TODO: Implementar navegación a centro de ayuda
+                },
               ),
               _buildProfileOption(
                 icon: Icons.info_outline,
-                title: 'About App',
-                onTap: () {},
+                title: 'Acerca de la Aplicación',
+                onTap: () {
+                  // TODO: Implementar navegación a información de la app
+                },
               ),
             ],
           ),
@@ -225,20 +276,26 @@ class ProfileScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.logout),
               label: const Text(
-                'Log Out',
+                'Cerrar Sesión',
                 style: TextStyle(fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[50],
-                foregroundColor: Colors.red,
+                backgroundColor: accentGold.withOpacity(0.1),
+                foregroundColor: accentGold,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () {
-                // Acción de logout
+              onPressed: () async {
+                await authProvider.logout();
+                if (!context.mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
               },
             ),
           ),
@@ -331,7 +388,7 @@ class ProfileScreen extends StatelessWidget {
                       '\$${hotel.pricePerNight.toStringAsFixed(0)}/night',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
+                        color: primaryBlue,
                       ),
                     ),
                   ],
@@ -365,7 +422,7 @@ class ProfileScreen extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: primaryBlue,
                     ),
               ),
             ),
@@ -384,9 +441,9 @@ class ProfileScreen extends StatelessWidget {
     Widget? trailing,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.blue[700]),
+      leading: Icon(icon, color: primaryBlue),
       title: Text(title),
-      trailing: trailing ?? const Icon(Icons.chevron_right, size: 20),
+      trailing: trailing ?? const Icon(Icons.chevron_right, size: 20, color: primaryBlue),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       minLeadingWidth: 24,
       onTap: onTap,

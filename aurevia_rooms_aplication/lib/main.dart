@@ -1,4 +1,6 @@
 import 'package:aureviarooms/data/services/booking_repository.dart';
+import 'package:aureviarooms/data/services/room_rate_repository.dart';
+import 'package:aureviarooms/data/services/room_repository.dart';
 import 'package:aureviarooms/data/services/stay_repository.dart';
 import 'package:aureviarooms/data/services/user_model_repository.dart'; // <--- Importa el nuevo repositorio
 import 'package:flutter/material.dart';
@@ -48,6 +50,18 @@ void main() async {
         ),
         Provider(
           create: (context) => StayRepository(
+            context.read<ConnectionProvider>(),
+            context.read<LocalStorageManager>(),
+          ),
+        ),
+          Provider(
+          create: (context) => RoomRepository(
+            context.read<ConnectionProvider>(),
+            context.read<LocalStorageManager>(),
+          ),
+        ),
+        Provider(
+          create: (context) => RoomRateRepository(
             context.read<ConnectionProvider>(),
             context.read<LocalStorageManager>(),
           ),

@@ -1,4 +1,7 @@
 // archivo: app.dart
+// ignore_for_file: cast_from_null_always_fails
+
+import 'package:aureviarooms/trash/checking_booking_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/core/theme/app_theme.dart';
@@ -6,9 +9,7 @@ import 'package:aureviarooms/presentation/navigation/owner_nav_bar.dart';
 import 'package:aureviarooms/presentation/navigation/user_nav_bar.dart';
 import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
-
-// Asume que BookingTestScreen sigue en 'trash' o es una pantalla temporal
-import 'package:aureviarooms/trash/checking_booking_repository.dart';
+import 'package:aureviarooms/presentation/screens/splash_screen.dart'; // <--- Importa tu nuevo SplashScreen
 
 
 // Wrapper para la lógica de selección de navegación
@@ -17,32 +18,36 @@ class UserTypeGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context); // Escucha los cambios en AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context);
 
+    // Si todavía estamos inicializando (comprobando la sesión y cargando el UserModel)
+    if (authProvider.isInitializingAuth) {
+      return const SplashScreen(); // <--- Muestra tu SplashScreen con animación
+    }
+
+    // Una vez que la inicialización ha terminado:
     // Si no está autenticado, siempre va a la pantalla de login
     if (!authProvider.isAuthenticated) {
       return const LoginScreen();
     }
 
-    // Si está autenticado, verifica el userType
-    // Muestra un indicador de carga mientras se carga el userType
+    // Si está autenticado pero el userType aún es null (indicando un posible error
+    // en la carga del UserModel a pesar de la inicialización),
+    // podrías mostrar un error o redirigir al login.
     if (authProvider.userType == null) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(), // O un logo, o pantalla de splash
-        ),
-      );
+      debugPrint('Error: Usuario autenticado pero tipo de usuario es nulo. Redirigiendo al login.');
+      return const LoginScreen(); // O una pantalla de error más descriptiva
     }
 
+    // Si está autenticado y el tipo de usuario está disponible
     switch (authProvider.userType) {
       case 'admin':
-        return const MainOwnerScreen(); // Si es admin, muestra la barra de navegación del Owner
+        return const OwnerNavBar();
       case 'guest':
-        return const UserNavBar(); // Si es guest, muestra la barra de navegación del User
+        return const UserNavBar();
       default:
-        // Caso por defecto si userType es null, indefinido, o algo inesperado
         debugPrint('Tipo de usuario desconocido: ${authProvider.userType}. Redirigiendo al login.');
-        return const LoginScreen(); // Redirige al login si el tipo no es reconocido
+        return const LoginScreen();
     }
   }
 }
@@ -57,11 +62,11 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AureviaRooms',
       theme: AppTheme.lightTheme,
-      home: const UserTypeGate(), // Ahora el 'home' siempre será el UserTypeGate
+      home: const UserTypeGate(),
       routes: {
-        '/booking-tests': (context) => const BookingTestScreen(),
+        '/booking-tests': (context) => const BookingTestScreen(), // Asumo que sigue siendo necesaria
         '/login': (context) => const LoginScreen(),
-        '/owner-home': (context) => const MainOwnerScreen(),
+        '/owner-home': (context) => const OwnerNavBar(),
         '/user-home': (context) => const UserNavBar(),
       },
     );
