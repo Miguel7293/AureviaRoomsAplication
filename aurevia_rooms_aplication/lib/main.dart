@@ -1,5 +1,6 @@
 import 'package:aureviarooms/data/services/booking_repository.dart';
 import 'package:aureviarooms/data/services/stay_repository.dart';
+import 'package:aureviarooms/data/services/user_model_repository.dart'; // <--- Importa el nuevo repositorio
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
@@ -18,16 +19,27 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ConnectionProvider()),
-        ChangeNotifierProxyProvider<ConnectionProvider, AuthProvider>(
+        // Provee LocalStorageManager y UserModelRepository primero si AuthProvider los necesita
+        Provider(create: (_) => LocalStorageManager()),
+        // UserModelRepository depende de ConnectionProvider y LocalStorageManager
+        Provider(
+          create: (context) => UserModelRepository(
+            context.read<ConnectionProvider>(),
+            context.read<LocalStorageManager>(),
+          ),
+        ),
+        ChangeNotifierProxyProvider2<ConnectionProvider, UserModelRepository, AuthProvider>( // <--- Cambia a ProxyProvider2
           create: (context) => AuthProvider(
             context.read<ConnectionProvider>(),
+            context.read<UserModelRepository>(), // <--- Pasa el UserModelRepository
           ),
-          update: (context, connection, previous) {
+          update: (context, connection, userModelRepo, previous) {
             previous?.updateConnection(connection);
+            // Si AuthProvider necesita actualizarse con el nuevo userModelRepo, hazlo aquí.
+            // En este caso, el repo no cambia, solo se inyecta al inicio.
             return previous!;
           },
         ),
-        Provider(create: (_) => LocalStorageManager()),
         Provider(
           create: (context) => BookingRepository(
             context.read<ConnectionProvider>(),

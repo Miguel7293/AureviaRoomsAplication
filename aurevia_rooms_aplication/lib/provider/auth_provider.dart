@@ -5,35 +5,65 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../config/supabase/supabase_config.dart';
+import '../data/models/user_model.dart'; // <--- Importa tu modelo de usuario
+import '../data/services/user_model_repository.dart'; // <--- Importa tu repositorio de usuario
 import 'connection_provider.dart';
 
 class AuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
   String? _userId;
   User? _currentUser;
+  UserModel? _appUser; // <--- Almacenará el UserModel completo
   final SupabaseClient _client = SupabaseConfig.client;
   late ConnectionProvider _connectionProvider;
+  final UserModelRepository _userModelRepository; // <--- Inyecta el repositorio
+
   StreamSubscription<AuthState>? _authSubscription;
 
-  AuthProvider(this._connectionProvider) {
+  AuthProvider(this._connectionProvider, this._userModelRepository) { // <--- Recibe el repositorio
     _setupAuthListener();
+    _loadAppUser(); // <--- Cargar el UserModel al inicializar
   }
 
   bool get isAuthenticated => _isAuthenticated;
   String? get userId => _userId;
   User? get currentUser => _currentUser;
+  UserModel? get appUser => _appUser; // <--- Getter para el UserModel completo
+  String? get userType => _appUser?.userType; // <--- Getter para el userType del UserModel
 
   void updateConnection(ConnectionProvider newConnection) {
     _connectionProvider = newConnection;
   }
 
   void _setupAuthListener() {
-    _authSubscription = _client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = _client.auth.onAuthStateChange.listen((data) async { // <--- Hazlo async
       _currentUser = data.session?.user;
       _userId = _currentUser?.id;
       _isAuthenticated = _currentUser != null;
+
+      if (_isAuthenticated) {
+        await _loadAppUser(); // <--- Cargar el UserModel cuando el estado de auth cambia a logueado
+      } else {
+        _appUser = null; // Limpiar el UserModel si no está autenticado
+      }
       notifyListeners();
     });
+  }
+
+  // Método para cargar el UserModel completo
+  Future<void> _loadAppUser() async {
+    if (_userId != null) {
+      try {
+        _appUser = await _userModelRepository.getUserById(_userId!);
+        debugPrint('AuthProvider: App User loaded: ${_appUser?.username}, Type: ${_appUser?.userType}');
+      } catch (e) {
+        debugPrint('AuthProvider: Error loading App User: $e');
+        _appUser = null; // Asegurarse de que el usuario sea nulo si hay un error
+      }
+    } else {
+      _appUser = null;
+    }
+    notifyListeners();
   }
 
   Future<void> loginWithGoogle() async {
@@ -42,7 +72,7 @@ class AuthProvider with ChangeNotifier {
         throw Exception('No hay conexión a internet');
       }
 
-      const webClientId = '546959425861-4dkijnept6pgua31kpqtch2kiva3jgo5.apps.googleusercontent.com';
+      const webClientId = '546959425861-4dkijnept6pgua31kpqtch2kiva3jgo5.apps.googleusercontent.com'; // Asegúrate que este Client ID sea correcto
 
       final googleSignIn = GoogleSignIn(
         serverClientId: webClientId,
@@ -60,22 +90,45 @@ class AuthProvider with ChangeNotifier {
         accessToken: googleAuth.accessToken!,
       );
 
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300)); // Pequeña espera
 
-      final user = _client.auth.currentUser;
+      _currentUser = _client.auth.currentUser;
+      _userId = _currentUser?.id;
+      _isAuthenticated = _currentUser != null;
 
-      if (user != null) {
+      if (_currentUser != null) {
+        // Después de un login exitoso, verifica si el UserModel existe.
+        // Si no existe, créalo con un tipo de usuario predeterminado ('guest').
+        try {
+          _appUser = await _userModelRepository.getUserById(_currentUser!.id);
+        } catch (e) {
+          // Si el usuario no existe en tu tabla 'user_model', créalo.
+          debugPrint('UserModel not found, creating new user record...');
+          _appUser = UserModel(
+            authUserId: _currentUser!.id,
+            username: _currentUser!.userMetadata?['full_name'] as String? ?? 'Usuario',
+            email: _currentUser!.email!,
+            userType: 'guest', // <--- Asigna un tipo de usuario predeterminado
+            createdAt: DateTime.now(),
+            profileImageUrl: _currentUser!.userMetadata?['avatar_url'] as String?,
+          );
+          await _userModelRepository.createUser(_appUser!);
+        }
+
         debugPrint('Usuario conectado:');
-        debugPrint('ID: ${user.id}');
-        debugPrint('Email: ${user.email}');
-        debugPrint('Nombre completo: ${user.userMetadata?["full_name"]}');
-        debugPrint('Foto de perfil: ${user.userMetadata?["avatar_url"]}');
+        debugPrint('ID: ${_currentUser!.id}');
+        debugPrint('Email: ${_currentUser!.email}');
+        debugPrint('Nombre completo: ${_currentUser!.userMetadata?["full_name"]}');
+        debugPrint('Foto de perfil: ${_currentUser!.userMetadata?["avatar_url"]}');
+        debugPrint('Tipo de usuario: ${_appUser?.userType}'); // Mostrar el tipo de usuario de tu modelo
       } else {
         debugPrint('No se obtuvo usuario después de login');
       }
     } catch (e) {
       debugPrint('Error Google SignIn: $e');
       rethrow;
+    } finally {
+      notifyListeners();
     }
   }
 
@@ -84,6 +137,7 @@ class AuthProvider with ChangeNotifier {
       _isAuthenticated = false;
       _userId = null;
       _currentUser = null;
+      _appUser = null; // Limpiar el UserModel al hacer logout
       notifyListeners();
 
       if (!_connectionProvider.isConnected) {
@@ -121,6 +175,7 @@ class AuthProvider with ChangeNotifier {
       _isAuthenticated = false;
       _userId = null;
       _currentUser = null;
+      _appUser = null;
       notifyListeners();
     }
   }
