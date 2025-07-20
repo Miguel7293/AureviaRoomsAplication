@@ -1,12 +1,15 @@
+// lib/presentation/screens/user/map_user_screen.dart
+
+import 'package:aureviarooms/presentation/screens/user/stay_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-
+import 'package:provider/provider.dart';
 import '../../../data/models/stay_model.dart';
 import '../../../data/services/stay_repository.dart';
+import '../../../controller/map_controller.dart';
 import '../../../provider/connection_provider.dart';
 import '../../../data/services/local_storage_manager.dart';
 import '../../../data/services/map_service.dart';
-import '../../../controller/map_controller.dart';
 
 class MapUserScreen extends StatefulWidget {
   const MapUserScreen({super.key});
@@ -17,28 +20,26 @@ class MapUserScreen extends StatefulWidget {
 
 class _MapUserScreenState extends State<MapUserScreen> {
   late MapController _mapController;
-
   bool _isLoading = true;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    final stayRepository = Provider.of<StayRepository>(context, listen: false);
 
     // ✅ Crear las dependencias necesarias
     final connectionProvider = ConnectionProvider();
     final localStorageManager = LocalStorageManager();
-    final stayRepository = StayRepository(connectionProvider);
 
     // ✅ Inicializar el controlador del mapa
     _mapController = MapController(
       stayRepo: stayRepository,
-      updateUI: () => setState(() {}), // fuerza reconstrucción de la UI
+      updateUI: () { if (mounted) setState(() {}); },
       showStayDetails: _showStayDetails,
       showMessage: _showSnackBar,
     );
 
-    // ✅ Inicializar mapa (ubicación + stays)
     _initializeMap();
   }
 
@@ -46,24 +47,41 @@ class _MapUserScreenState extends State<MapUserScreen> {
     try {
       await _mapController.initialize();
     } catch (e) {
-      _errorMessage = e.toString();
+      if (mounted) _errorMessage = e.toString();
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _showStayDetails(Stay stay) {
-    // 👉 Aquí decides qué hacer cuando el usuario toca un marcador
-    // Por ejemplo, mostrar un BottomSheet con información del hotel
     showModalBottomSheet(
       context: context,
-      builder: (_) => _StayDetailsSheet(stay: stay),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _StayDetailsSheet(
+        stay: stay,
+        onGetDirections: () {
+          Navigator.pop(context);
+          _mapController.drawRouteToStay(stay);
+        },
+        onViewDetails: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => StayDetailScreen(stay: stay)),
+          );
+        },
+      ),
     );
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   @override
@@ -75,11 +93,16 @@ class _MapUserScreenState extends State<MapUserScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mapa de Hoteles')),
+      appBar: AppBar(title: const Text('Mapa de Alojamientos')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text('Error: $_errorMessage'))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('Error al cargar el mapa: $_errorMessage', textAlign: TextAlign.center),
+                  ),
+                )
               : GoogleMap(
                   initialCameraPosition: _mapController.initialCameraPosition,
                   markers: _mapController.markers,
@@ -94,29 +117,51 @@ class _MapUserScreenState extends State<MapUserScreen> {
 
 class _StayDetailsSheet extends StatelessWidget {
   final Stay stay;
+  final VoidCallback onGetDirections;
+  final VoidCallback onViewDetails;
 
-  const _StayDetailsSheet({required this.stay});
+  const _StayDetailsSheet({
+    required this.stay,
+    required this.onGetDirections,
+    required this.onViewDetails,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(stay.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(stay.description ?? 'Sin descripción'),
-          const SizedBox(height: 8),
-          Text('Categoría: ${stay.category}'),
-          if (stay.mainImageUrl != null) ...[
-            const SizedBox(height: 10),
-            Image.network(stay.mainImageUrl!, height: 120, fit: BoxFit.cover),
-          ],
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
+          Text(stay.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Text(stay.description ?? 'Sin descripción disponible.', style: TextStyle(color: Colors.grey[700], fontSize: 16)),
+          const SizedBox(height: 12),
+          Text('Categoría: ${stay.category}', style: const TextStyle(fontSize: 16, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('Saber más'),
+                  onPressed: onViewDetails,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.directions),
+                  label: const Text('Cómo llegar'),
+                  onPressed: onGetDirections,
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.blueAccent
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
