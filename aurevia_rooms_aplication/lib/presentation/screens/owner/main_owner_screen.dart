@@ -1,8 +1,15 @@
-// lib/presentation/screens/user/main_user_screen.dart
-import 'package:flutter/material.dart';
+// lib/presentation/screens/owner/main_owner_screen.dart
 
-import 'package:aureviarooms/data/models/hotel.dart';
-import 'package:aureviarooms/data/services/hotel_service.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:aureviarooms/data/models/stay_model.dart';
+import 'package:aureviarooms/data/services/stay_repository.dart';
+import 'package:aureviarooms/provider/auth_provider.dart'; // <-- Necesario para obtener el ID del dueño
+
+// Importa los otros repositorios si la tarjeta necesita calcular precios
+// import 'package:aureviarooms/data/repositories/room_repository.dart';
+// import 'package:aureviarooms/data/repositories/room_rate_repository.dart';
+
 
 class MainOwnerScreen extends StatefulWidget {
   const MainOwnerScreen({super.key});
@@ -12,7 +19,32 @@ class MainOwnerScreen extends StatefulWidget {
 }
 
 class _MainOwnerScreenState extends State<MainOwnerScreen> {
-  final HotelService _hotelService = HotelService();
+  late Future<List<Stay>> _ownerStaysFuture;
+  String? _ownerId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // ANOTACIÓN: Obtenemos el ID del dueño actual desde AuthProvider.
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _ownerId = authProvider.userId;
+    _loadOwnerStays();
+  }
+
+  void _loadOwnerStays() {
+    if (_ownerId == null) {
+      // Si no hay ID de dueño, no podemos cargar nada.
+      setState(() {
+        _ownerStaysFuture = Future.value([]); // Devuelve una lista vacía
+      });
+      return;
+    }
+    final stayRepository = Provider.of<StayRepository>(context, listen: false);
+    setState(() {
+      // ANOTACIÓN: Usamos el método específico para obtener los alojamientos del dueño.
+      _ownerStaysFuture = stayRepository.getStaysByOwner(_ownerId!);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,30 +55,32 @@ class _MainOwnerScreenState extends State<MainOwnerScreen> {
         automaticallyImplyLeading: false,
         title: Align(
           alignment: Alignment.centerLeft,
-          child: Image.asset(
-            'assets/Logo_Nombre.png',
-            height: 40,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => const Text(
-              'AureviaRooms',
-              style: TextStyle(color: Colors.black),
-            ),
-          ),
+          child: Image.asset('assets/Logo_Nombre.png', height: 40),
         ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color(0xFF2A3A5B)),
+            onPressed: _loadOwnerStays,
           ),
-        ),
+        ],
       ),
-      body: HomeTab(hotelService: _hotelService),
+      // ANOTACIÓN: Pasamos el Future al widget de la UI.
+      body: HomeTab(ownerStaysFuture: _ownerStaysFuture),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // TODO: Navegar a la pantalla para crear un nuevo Stay.
+        },
+        backgroundColor: Colors.blueAccent,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
-class HomeTab extends StatelessWidget {
-  final HotelService hotelService;
 
-  const HomeTab({super.key, required this.hotelService});
+class HomeTab extends StatelessWidget {
+  final Future<List<Stay>> ownerStaysFuture;
+
+  const HomeTab({super.key, required this.ownerStaysFuture});
 
   @override
   Widget build(BuildContext context) {
@@ -57,82 +91,28 @@ class HomeTab extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Find your perfect stay',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+              'Gestiona tus Alojamientos', // <-- Texto adaptado para el dueño
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Search deals on hotels, homes, and much more...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              'Revisa, edita o añade nuevas estancias.', // <-- Texto adaptado
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 24),
-            _buildSearchAndFilters(),
+            // ANOTACIÓN: La sección de búsqueda y filtros puede ser diferente para el dueño.
+            // Por ahora la mantenemos, pero podrías querer cambiarla o quitarla.
             const SizedBox(height: 24),
-            _buildFeaturedPlaces(),
+            _buildYourPlacesList(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSearchAndFilters() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const TextField(
-            decoration: InputDecoration(
-              hintText: 'Where are you going?',
-              border: InputBorder.none,
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
-              contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          children: [
-            _buildFilterChip('All', true),
-            _buildFilterChip('Hotels', false),
-            _buildFilterChip('Apartments', false),
-          ],
-        ),
-      ],
-    );
-  }
 
-  Widget _buildFilterChip(String label, bool selected) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (bool value) {},
-      selectedColor: Colors.blueAccent,
-      checkmarkColor: Colors.white,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : Colors.black87,
-      ),
-      backgroundColor: Colors.grey[200],
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: selected ? Colors.blueAccent : Colors.grey[300]!,
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFeaturedPlaces() {
+  Widget _buildYourPlacesList(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -140,50 +120,37 @@ class HomeTab extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Featured Places',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+              'Tus Alojamientos', // <-- Texto adaptado
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             TextButton(
               onPressed: () {},
-              child: const Text(
-                'View all',
-                style: TextStyle(
-                  color: Colors.blueAccent,
-                ),
-              ),
+              child: const Text('Ver todos', style: TextStyle(color: Colors.blueAccent)),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        FutureBuilder<List<Hotel>>(
-          future: hotelService.getFeaturedHotels(), // Usar el servicio pasado
+        // ANOTACIÓN: El FutureBuilder ahora consume los alojamientos del dueño.
+        FutureBuilder<List<Stay>>(
+          future: ownerStaysFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            
             if (snapshot.hasError) {
-              return const Center(child: Text('Error loading hotels'));
+              return Center(child: Text('Error: ${snapshot.error}'));
             }
-            
-            final hotels = snapshot.data ?? [];
-            
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('Aún no tienes alojamientos registrados.'));
+            }
+            final stays = snapshot.data!;
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: hotels.length,
+              itemCount: stays.length,
               itemBuilder: (context, index) {
-                final hotel = hotels[index];
-                return _buildFeaturedPlaceCard(
-                  hotel.name,
-                  hotel.location,
-                  '\$${hotel.pricePerNight} /night',
-                  hotel.imageUrl,
-                );
+                final stay = stays[index];
+                return _buildStayCard(stay);
               },
             );
           },
@@ -192,28 +159,24 @@ class HomeTab extends StatelessWidget {
     );
   }
 
-  Widget _buildFeaturedPlaceCard(String title, String location, String price, String imageUrl) {
+  // ANOTACIÓN: La tarjeta ahora solo necesita el objeto Stay.
+  Widget _buildStayCard(Stay stay) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Image.network(
-              imageUrl,
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
+              stay.mainImageUrl ?? 'https://via.placeholder.com/400x200?text=AureviaRooms',
+              height: 180, width: double.infinity, fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
-                height: 180,
-                color: Colors.grey[200],
-                child: const Icon(Icons.hotel, size: 50, color: Colors.grey),
-              ),
+                  height: 180,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.hotel, size: 50, color: Colors.grey)),
             ),
           ),
           Padding(
@@ -222,29 +185,19 @@ class HomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                  stay.name,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 const SizedBox(height: 4),
+                // ANOTACIÓN: Mostramos el estado del alojamiento, útil para el dueño.
                 Text(
-                  location,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    fontSize: 16,
+                  'Estado: ${stay.status}',
+                  style: TextStyle(
+                    color: stay.status == 'published' ? Colors.green : Colors.orange,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent,
                   ),
                 ),
+                // Podrías añadir más información relevante para el dueño aquí.
               ],
             ),
           ),

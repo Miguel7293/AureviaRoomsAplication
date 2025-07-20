@@ -21,9 +21,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ConnectionProvider()),
-        // Provee LocalStorageManager y UserModelRepository primero si AuthProvider los necesita
         Provider(create: (_) => LocalStorageManager()),
-        // UserModelRepository depende de ConnectionProvider y LocalStorageManager
         Provider(
           create: (context) => UserModelRepository(
             context.read<ConnectionProvider>(),
@@ -37,8 +35,6 @@ void main() async {
           ),
           update: (context, connection, userModelRepo, previous) {
             previous?.updateConnection(connection);
-            // Si AuthProvider necesita actualizarse con el nuevo userModelRepo, hazlo aquí.
-            // En este caso, el repo no cambia, solo se inyecta al inicio.
             return previous!;
           },
         ),

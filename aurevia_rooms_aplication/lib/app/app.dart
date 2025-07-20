@@ -9,10 +9,13 @@ import 'package:aureviarooms/presentation/navigation/owner_nav_bar.dart';
 import 'package:aureviarooms/presentation/navigation/user_nav_bar.dart';
 import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
-import 'package:aureviarooms/presentation/screens/splash_screen.dart'; // <--- Importa tu nuevo SplashScreen
+import 'package:aureviarooms/presentation/screens/splash_screen.dart'; 
+import 'package:aureviarooms/presentation/screens/sign/choosing_role_screen.dart';
+import 'package:aureviarooms/presentation/screens/sign/waiting_approval_screen.dart';
 
 
-// Wrapper para la lógica de selección de navegación
+
+
 class UserTypeGate extends StatelessWidget {
   const UserTypeGate({super.key});
 
@@ -20,34 +23,31 @@ class UserTypeGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
 
-    // Si todavía estamos inicializando (comprobando la sesión y cargando el UserModel)
+    // Muestra SplashScreen mientras se verifica la sesión
     if (authProvider.isInitializingAuth) {
-      return const SplashScreen(); // <--- Muestra tu SplashScreen con animación
+      return const SplashScreen();
     }
 
-    // Una vez que la inicialización ha terminado:
-    // Si no está autenticado, siempre va a la pantalla de login
-    if (!authProvider.isAuthenticated) {
+    // Si el usuario está autenticado, decide a dónde va
+    if (authProvider.isAuthenticated) {
+      switch (authProvider.userType) {
+        case 'admin':
+          return const OwnerNavBar(); // Para administradores
+        case 'guest':
+          return const UserNavBar(); // Para usuarios/huéspedes
+        case 'NotSpecified':
+          return const ChoosingRoleScreen(); // Para elegir rol
+        case 'isWaiting':
+          return const WaitingApprovalScreen(); // Para usuarios en espera
+        default:
+          // Si el tipo es nulo o desconocido, podría ser un error.
+          // Enviar al login es una opción segura.
+          debugPrint('Usuario autenticado pero con rol desconocido/nulo: ${authProvider.userType}');
+          return const LoginScreen();
+      }
+    } else {
+      // Si no está autenticado, siempre va al login
       return const LoginScreen();
-    }
-
-    // Si está autenticado pero el userType aún es null (indicando un posible error
-    // en la carga del UserModel a pesar de la inicialización),
-    // podrías mostrar un error o redirigir al login.
-    if (authProvider.userType == null) {
-      debugPrint('Error: Usuario autenticado pero tipo de usuario es nulo. Redirigiendo al login.');
-      return const LoginScreen(); // O una pantalla de error más descriptiva
-    }
-
-    // Si está autenticado y el tipo de usuario está disponible
-    switch (authProvider.userType) {
-      case 'admin':
-        return const OwnerNavBar();
-      case 'guest':
-        return const UserNavBar();
-      default:
-        debugPrint('Tipo de usuario desconocido: ${authProvider.userType}. Redirigiendo al login.');
-        return const LoginScreen();
     }
   }
 }
@@ -68,6 +68,8 @@ class App extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/owner-home': (context) => const OwnerNavBar(),
         '/user-home': (context) => const UserNavBar(),
+        '/choosing-role': (context) => const ChoosingRoleScreen(),
+        '/waiting-approval': (context) => const WaitingApprovalScreen(),
       },
     );
   }

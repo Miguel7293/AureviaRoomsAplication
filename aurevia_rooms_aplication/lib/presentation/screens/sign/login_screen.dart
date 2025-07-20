@@ -1,8 +1,8 @@
-import 'package:aureviarooms/app/app.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,14 +14,41 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
-  static const Color primaryBlue = Color(0xFF2A3A5B);
-  static const Color accentGold = Color(0xFFD4AF37);
-  static const Color buttonTextColor = Colors.white;
-  static const Color googleIconColor = Color(0xFF4285F4);
+  // --- NUEVO MÉTODO PARA MANEJAR EL LOGIN ---
+Future<void> _handleGoogleLogin() async {
+  if (_isLoading) return;
+
+  setState(() => _isLoading = true);
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  
+  try {
+    // Simplemente intenta iniciar sesión.
+    // El UserTypeGate se encargará de la redirección automáticamente.
+    await authProvider.loginWithGoogle();
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al iniciar sesión: ${e is AuthException ? e.message : e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      // Ocultamos el loading, pero no navegamos.
+      setState(() => _isLoading = false);
+    }
+  }
+}
+
+
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    // El resto de tu UI se mantiene, solo cambiamos el `onPressed` del botón
+    const Color primaryBlue = Color(0xFF2A3A5B);
+    const Color accentGold = Color(0xFFD4AF37);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -36,8 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 180,
               ),
               const SizedBox(height: 40),
-
-              Text(
+              const Text(
                 'Bienvenido',
                 style: TextStyle(
                   fontSize: 28,
@@ -57,63 +83,22 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 60),
 
               _isLoading
-                  ? CircularProgressIndicator(color: primaryBlue)
+                  ? const CircularProgressIndicator(color: primaryBlue)
                   : SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () async {
-                          // 1. Mostrar el indicador de carga INMEDIATAMENTE
-                          setState(() { // <--- Aquí, esto es seguro porque la pantalla aún está montada
-                            _isLoading = true;
-                          });
-
-                          try {
-                            await authProvider.loginWithGoogle();
-
-                            // 2. Después de la operación asíncrona, verifica si la pantalla sigue montada
-                            if (!context.mounted) {
-                              // Si ya no está montada, no intentes actualizar el estado
-                              // Ni navegues, ni muestres SnackBar, simplemente sal.
-                              return;
-                            }
-
-                            if (authProvider.isAuthenticated) {
-
-                                Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(builder: (context) => const UserTypeGate()), // Vuelve al UserTypeGate
-                                (route) => false, // Elimina todas las rutas anteriores
-                              );
-                            }
-                          } catch (e) {
-                            // 4. Si hay un error, también verifica si la pantalla sigue montada
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error al iniciar sesión: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          } finally {
-                            // 5. En el bloque finally, SIEMPRE verifica si la pantalla sigue montada
-                            // antes de intentar ocultar el indicador de carga.
-                            if (context.mounted) { // <--- ¡Añade esta verificación aquí!
-                              setState(() {
-                                _isLoading = false;
-                              });
-                            }
-                          }
-                        },
+                        // --- AQUÍ CONECTAMOS EL NUEVO MÉTODO ---
+                        onPressed: _handleGoogleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryBlue,
-                          foregroundColor: buttonTextColor,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                           elevation: 5,
                         ),
-                        icon: FaIcon(
+                        icon: const FaIcon(
                           FontAwesomeIcons.google,
                           color: accentGold,
                         ),
