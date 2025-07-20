@@ -7,7 +7,7 @@ class AppTheme {
         textTheme: const TextTheme(
           bodyMedium: TextStyle(color: Colors.black87),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.white,
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -27,7 +27,7 @@ class AppTheme {
             fontFamily: null, // Default font
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFFFFFFFF), // White
           elevation: 2,
           shape: RoundedRectangleBorder(
