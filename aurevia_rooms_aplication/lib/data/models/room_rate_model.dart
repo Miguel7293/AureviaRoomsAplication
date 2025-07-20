@@ -1,39 +1,20 @@
-class RoomRate {
-  final int? id;
-  final int roomId;
-  final String rateType;
-  final double price;
-  final DateTime createdAt;
-  final String? promotionId;
+// lib/data/models/room_rate_model.dart
 
-  RoomRate({
-    this.id,
-    required this.roomId,
-    required this.rateType,
-    required this.price,
-    required this.createdAt,
-    this.promotionId,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  factory RoomRate.fromJson(Map<String, dynamic> json) {
-    return RoomRate(
-      id: json['id'],
-      roomId: json['room_id'],
-      rateType: json['rate_type'],
-      price: (json['price'] as num).toDouble(),
-      createdAt: DateTime.parse(json['created_at']),
-      promotionId: json['promotion_id'],
-    );
-  }
+part 'room_rate_model.freezed.dart';
+part 'room_rate_model.g.dart';
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'room_id': roomId,
-      'rate_type': rateType,
-      'price': price,
-      'created_at': createdAt.toIso8601String(),
-      'promotion_id': promotionId,
-    };
-  }
+@freezed
+class RoomRate with _$RoomRate {
+  const factory RoomRate({
+    @JsonKey(includeIfNull: false) int? id,
+    @JsonKey(name: 'room_id') required int roomId,
+    @JsonKey(name: 'rate_type') required String rateType,
+    required double price,
+    @JsonKey(name: 'created_at') required DateTime createdAt,
+    @JsonKey(name: 'promotion_id') String? promotionId,
+  }) = _RoomRate;
+
+  factory RoomRate.fromJson(Map<String, dynamic> json) => _$RoomRateFromJson(json);
 }

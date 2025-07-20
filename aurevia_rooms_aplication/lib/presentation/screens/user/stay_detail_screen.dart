@@ -1,3 +1,4 @@
+import 'package:aureviarooms/data/services/methods/room_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/models/stay_model.dart';
@@ -67,16 +68,17 @@ class _StayDetailScreenState extends State<StayDetailScreen> {
       debugPrint('Error obteniendo tarifas para Room $roomId: $e');
     }
 
-    final Room? room = (await _roomRepository.getRoomById(roomId));
-    if (room?.features != null && room!.features!.isNotEmpty) {
-      featuresText = room.features!.entries.map((entry) {
-        final key = entry.key;
-        final value = entry.value;
-        if (value is bool) return '${key.replaceFirst(key[0], key[0].toUpperCase())}: ${value ? 'Sí' : 'No'}';
-        return '${key.replaceFirst(key[0], key[0].toUpperCase())}: $value';
-      }).join(', ');
-    }
-
+final Room? room = await RoomService.getRoomById(context: context, roomId: roomId);
+final features = room?.features;
+if (features != null && features.isNotEmpty) {
+  // Dentro de este bloque, Dart sabe que 'features' no es nulo y es seguro de usar.
+  featuresText = features.entries.map((entry) {
+    final key = entry.key;
+    final value = entry.value;
+    if (value is bool) return '${key.replaceFirst(key[0], key[0].toUpperCase())}: ${value ? 'Sí' : 'No'}';
+    return '${key.replaceFirst(key[0], key[0].toUpperCase())}: $value';
+  }).join(', ');
+}
     return {
       'minPrice': minPrice,
       'featuresText': featuresText,

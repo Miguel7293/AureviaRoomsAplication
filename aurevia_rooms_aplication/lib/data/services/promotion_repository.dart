@@ -1,175 +1,122 @@
-// promotion_repository.dart
+// lib/data/services/promotion_repository.dart
+
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:aureviarooms/data/models/promotion_model.dart';
-import 'package:aureviarooms/data/services/local_storage_manager.dart';
-import 'package:aureviarooms/provider/connection_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:retry/retry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/supabase/supabase_config.dart';
+import '../../provider/connection_provider.dart';
+import '../models/promotion_model.dart';
 
 class PromotionRepository {
   final SupabaseClient _client;
   final ConnectionProvider _connectionProvider;
-  final LocalStorageManager _localStorage;
   final RetryOptions _retryOptions;
 
-  PromotionRepository(this._connectionProvider, this._localStorage)
+  static const _cacheKey = 'all_promotions_cache';
+
+  PromotionRepository(this._connectionProvider)
       : _client = SupabaseConfig.client,
         _retryOptions = const RetryOptions(maxAttempts: 3, delayFactor: Duration(seconds: 1));
-
+  
   Future<Promotion> createPromotion(Promotion promotion) async {
-    if (!await _connectionProvider.isConnected) {
-      throw Exception('No hay conexión a internet');
-    }
-
+    await _guardConnection();
     final response = await _retryOptions.retry(
       () => _client.from('promotions').insert(promotion.toJson()).select().single(),
     );
-
     final newPromotion = Promotion.fromJson(response);
-    await _cachePromotion(newPromotion);
+    await _addOrUpdateCache([newPromotion]);
     return newPromotion;
   }
 
   Future<Promotion> updatePromotion(Promotion promotion) async {
-    if (!await _connectionProvider.isConnected) {
-      throw Exception('No hay conexión a internet');
-    }
-
+    await _guardConnection();
+    if (promotion.promotionId == null) throw Exception('El promotionId es requerido.');
+    
     final response = await _retryOptions.retry(
-      () => _client.from('promotions')
-          .update(promotion.toJson())
-          .eq('promotion_id', promotion.promotionId)
-          .select()
-          .single(),
+      () => _client.from('promotions').update(promotion.toJson()).eq('promotion_id', promotion.promotionId!).select().single(),
     );
-
     final updatedPromotion = Promotion.fromJson(response);
-    await _cachePromotion(updatedPromotion);
+    await _addOrUpdateCache([updatedPromotion]);
     return updatedPromotion;
   }
 
   Future<void> deletePromotion(String promotionId) async {
-    if (!await _connectionProvider.isConnected) {
-      throw Exception('No hay conexión a internet');
-    }
-
+    await _guardConnection();
     await _retryOptions.retry(
       () => _client.from('promotions').delete().eq('promotion_id', promotionId),
     );
-
-    await _removeCachedPromotion(promotionId);
-  }
-
-  Future<Promotion> getPromotionById(String promotionId) async {
-    if (!await _connectionProvider.isConnected) {
-      return _getCachedPromotion(promotionId);
-    }
-
-    try {
-      final response = await _retryOptions.retry(
-        () => _client.from('promotions').select().eq('promotion_id', promotionId).single(),
-      );
-
-      final promotion = Promotion.fromJson(response);
-      await _cachePromotion(promotion);
-      return promotion;
-    } catch (e) {
-      debugPrint('❌ Error obteniendo promoción: $e');
-      return _getCachedPromotion(promotionId);
-    }
+    await _removePromotionFromCache(promotionId);
   }
 
   Future<List<Promotion>> getActivePromotionsByStay(int stayId) async {
+    final now = DateTime.now();
+
+    bool isPromotionActive(Promotion p) {
+      return p.stayId == stayId &&
+             p.state == 'active' &&
+             (p.startDate.isBefore(now) || p.startDate.isAtSameMomentAs(now)) &&
+             (p.endDate.isAfter(now) || p.endDate.isAtSameMomentAs(now));
+    }
+
+    final cachedPromotions = await _getPromotionsFromCache();
     if (!await _connectionProvider.isConnected) {
-      return _getCachedStayPromotions(stayId);
+      return cachedPromotions.values.where(isPromotionActive).toList();
     }
 
     try {
-      final now = DateTime.now().toIso8601String();
-      final response = await _retryOptions.retry(
-        () => _client.from('promotions')
+      final response = await _retryOptions.retry(() => _client.from('promotions')
           .select()
           .eq('stay_id', stayId)
-          .gte('end_date', now)
-          .lte('start_date', now)
-          .eq('state', 'Active'),
-      );
-
+          .eq('state', 'active')
+          .lte('start_date', now.toIso8601String())
+          .gte('end_date', now.toIso8601String()));
       final promotions = (response as List).map((json) => Promotion.fromJson(json)).toList();
-      await _cacheStayPromotions(stayId, promotions);
+      await _addOrUpdateCache(promotions);
       return promotions;
     } catch (e) {
-      debugPrint('❌ Error obteniendo promociones activas: $e');
-      return _getCachedStayPromotions(stayId);
+      debugPrint('❌ Error obteniendo promociones, filtrando desde caché: $e');
+      return cachedPromotions.values.where(isPromotionActive).toList();
     }
   }
 
-  // Caché methods
-  Future<void> _cachePromotion(Promotion promotion) async {
-    final prefs = await SharedPreferences.getInstance();
-    final promotions = await _getCachedPromotions();
-    final index = promotions.indexWhere((p) => p.promotionId == promotion.promotionId);
-    
-    if (index != -1) {
-      promotions[index] = promotion;
-    } else {
-      promotions.add(promotion);
-    }
-    
-    await prefs.setString('cached_promotions', jsonEncode(promotions.map((p) => p.toJson()).toList()));
+  Future<void> _guardConnection() async {
+    if (!await _connectionProvider.isConnected) throw Exception('No hay conexión a internet.');
   }
 
-  Future<void> _removeCachedPromotion(String promotionId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final promotions = await _getCachedPromotions();
-    promotions.removeWhere((p) => p.promotionId == promotionId);
-    await prefs.setString('cached_promotions', jsonEncode(promotions.map((p) => p.toJson()).toList()));
-  }
-
-  Future<List<Promotion>> _getCachedPromotions() async {
+  Future<Map<String, Promotion>> _getPromotionsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('cached_promotions');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Promotion.fromJson(json))
-          .toList();
+      final data = prefs.getString(_cacheKey);
+      if (data == null) return {};
+      final list = (jsonDecode(data) as List).map((json) => Promotion.fromJson(json));
+      return {for (var promo in list) promo.promotionId!: promo};
     } catch (e) {
-      debugPrint('⚠️ Error recuperando caché de promociones: $e');
-      return [];
+      debugPrint('⚠️ Error al leer caché de promociones: $e');
+      return {};
     }
   }
 
-  Future<Promotion> _getCachedPromotion(String promotionId) async {
-    final promotions = await _getCachedPromotions();
-    return promotions.firstWhere((p) => p.promotionId == promotionId, orElse: () => throw Exception('Promoción no encontrada en caché'));
-  }
-
-  Future<void> _cacheStayPromotions(int stayId, List<Promotion> promotions) async {
+  Future<void> _addOrUpdateCache(List<Promotion> promotions) async {
+    final cachedMap = await _getPromotionsFromCache();
+    for (var promo in promotions) {
+      if (promo.promotionId != null) {
+        cachedMap[promo.promotionId!] = promo;
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('stay_promotions_$stayId', jsonEncode(promotions.map((p) => p.toJson()).toList()));
+    final listToStore = cachedMap.values.map((p) => p.toJson()).toList();
+    await prefs.setString(_cacheKey, jsonEncode(listToStore));
   }
 
-  Future<List<Promotion>> _getCachedStayPromotions(int stayId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('stay_promotions_$stayId');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Promotion.fromJson(json))
-          .toList();
-    } catch (e) {
-      debugPrint('⚠️ Error recuperando caché de promociones de alojamiento: $e');
-      return [];
-    }
+  Future<void> _removePromotionFromCache(String promotionId) async {
+    final cachedMap = await _getPromotionsFromCache();
+    cachedMap.remove(promotionId);
+    final prefs = await SharedPreferences.getInstance();
+    final listToStore = cachedMap.values.map((p) => p.toJson()).toList();
+    await prefs.setString(_cacheKey, jsonEncode(listToStore));
   }
 }

@@ -28,7 +28,7 @@ class _MapUserScreenState extends State<MapUserScreen> {
     // ✅ Crear las dependencias necesarias
     final connectionProvider = ConnectionProvider();
     final localStorageManager = LocalStorageManager();
-    final stayRepository = StayRepository(connectionProvider, localStorageManager);
+    final stayRepository = StayRepository(connectionProvider);
 
     // ✅ Inicializar el controlador del mapa
     _mapController = MapController(

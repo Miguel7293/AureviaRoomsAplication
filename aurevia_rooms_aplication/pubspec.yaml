@@ -4,7 +4,7 @@ description: A hotel and room management application
 version: 1.0.0+1
 
 environment:
-  sdk: '>=2.19.4 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -24,11 +24,16 @@ dependencies:
   flutter_polyline_points: ^2.0.0
   geolocator: ^14.0.2
   google_maps_flutter_android: ^2.17.0
+  freezed_annotation: ^2.4.1 # O la versión más reciente
+  json_annotation: ^4.9.0    # O la versión más reciente
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  build_runner: ^2.4.11 # O la versión más reciente
+  freezed: ^2.5.2        # O la versión más reciente
+  json_serializable: ^6.8.0 # O la versión más reciente
 
 flutter:
   uses-material-design: true

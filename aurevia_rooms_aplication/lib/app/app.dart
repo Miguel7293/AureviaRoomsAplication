@@ -1,7 +1,6 @@
 // archivo: app.dart
 // ignore_for_file: cast_from_null_always_fails
 
-import 'package:aureviarooms/trash/checking_booking_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/core/theme/app_theme.dart';
@@ -64,7 +63,6 @@ class App extends StatelessWidget {
       theme: AppTheme.lightTheme,
       home: const UserTypeGate(),
       routes: {
-        '/booking-tests': (context) => const BookingTestScreen(), // Asumo que sigue siendo necesaria
         '/login': (context) => const LoginScreen(),
         '/owner-home': (context) => const OwnerNavBar(),
         '/user-home': (context) => const UserNavBar(),

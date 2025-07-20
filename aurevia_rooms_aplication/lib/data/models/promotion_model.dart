@@ -1,47 +1,22 @@
-class Promotion {
-  final String promotionId;
-  final int stayId;
-  final String description;
-  final double discountPercentage;
-  final DateTime startDate;
-  final DateTime endDate;
-  final DateTime createdAt;
-  final String state;
+// lib/data/models/promotion_model.dart
 
-  Promotion({
-    required this.promotionId,
-    required this.stayId,
-    required this.description,
-    required this.discountPercentage,
-    required this.startDate,
-    required this.endDate,
-    required this.createdAt,
-    required this.state,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  factory Promotion.fromJson(Map<String, dynamic> json) {
-    return Promotion(
-      promotionId: json['promotion_id'],
-      stayId: json['stay_id'],
-      description: json['description'],
-      discountPercentage: (json['discount_percentage'] as num).toDouble(),
-      startDate: DateTime.parse(json['start_date']),
-      endDate: DateTime.parse(json['end_date']),
-      createdAt: DateTime.parse(json['created_at']),
-      state: json['state'],
-    );
-  }
+part 'promotion_model.freezed.dart';
+part 'promotion_model.g.dart';
 
-  Map<String, dynamic> toJson() {
-    return {
-      'promotion_id': promotionId,
-      'stay_id': stayId,
-      'description': description,
-      'discount_percentage': discountPercentage,
-      'start_date': startDate.toIso8601String(),
-      'end_date': endDate.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'state': state,
-    };
-  }
+@freezed
+class Promotion with _$Promotion {
+  const factory Promotion({
+    @JsonKey(name: 'promotion_id', includeIfNull: false) String? promotionId,
+    @JsonKey(name: 'stay_id') required int stayId,
+    required String description,
+    @JsonKey(name: 'discount_percentage') required double discountPercentage,
+    @JsonKey(name: 'start_date') required DateTime startDate,
+    @JsonKey(name: 'end_date') required DateTime endDate,
+    @JsonKey(name: 'created_at') required DateTime createdAt,
+    required String state,
+  }) = _Promotion;
+
+  factory Promotion.fromJson(Map<String, dynamic> json) => _$PromotionFromJson(json);
 }

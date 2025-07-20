@@ -1,39 +1,21 @@
-class Review {
-  final int? reviewId;
-  final String userId;
-  final int stayId;
-  final int rating;
-  final String? comment;
-  final DateTime createdAt;
+// lib/data/models/review_model.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  Review({
-    this.reviewId,
-    required this.userId,
-    required this.stayId,
-    required this.rating,
-    this.comment,
-    required this.createdAt,
-  });
+part 'review_model.freezed.dart';
+part 'review_model.g.dart';
 
-  factory Review.fromJson(Map<String, dynamic> json) {
-    return Review(
-      reviewId: json['review_id'],
-      userId: json['user_id'],
-      stayId: json['stay_id'],
-      rating: json['rating'],
-      comment: json['comment'],
-      createdAt: DateTime.parse(json['created_at']),
-    );
-  }
+@freezed
+class Review with _$Review {
+  const factory Review({
+    // AÑADE includeIfNull: false A LA ANOTACIÓN
+    @JsonKey(name: 'review_id', includeIfNull: false) int? reviewId,
+    
+    @JsonKey(name: 'user_id') required String userId,
+    @JsonKey(name: 'stay_id') required int stayId,
+    required int rating,
+    String? comment,
+    @JsonKey(name: 'created_at') required DateTime createdAt,
+  }) = _Review;
 
-  Map<String, dynamic> toJson() {
-    return {
-      'review_id': reviewId,
-      'user_id': userId,
-      'stay_id': stayId,
-      'rating': rating,
-      'comment': comment,
-      'created_at': createdAt.toIso8601String(),
-    };
-  }
+  factory Review.fromJson(Map<String, dynamic> json) => _$ReviewFromJson(json);
 }

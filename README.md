@@ -43,4 +43,7 @@ generen su Sha-1
 desde la carpeta android
 
 cambien la direccion...
+
+
+genera el freezze->>> flutter pub run build_runner build --delete-conflicting-outputs
 -------------------------

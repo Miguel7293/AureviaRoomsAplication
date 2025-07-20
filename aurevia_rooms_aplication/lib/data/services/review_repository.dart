@@ -1,214 +1,188 @@
-// review_repository.dart
+// lib/data/services/review_repository.dart
+
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:aureviarooms/data/models/review_model.dart';
-import 'package:aureviarooms/data/services/local_storage_manager.dart';
-import 'package:aureviarooms/provider/connection_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:retry/retry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/supabase/supabase_config.dart';
+import '../../provider/connection_provider.dart';
+import '../models/review_model.dart';
 
 class ReviewRepository {
   final SupabaseClient _client;
   final ConnectionProvider _connectionProvider;
-  final LocalStorageManager _localStorage;
   final RetryOptions _retryOptions;
 
-  ReviewRepository(this._connectionProvider, this._localStorage)
+  // Clave única para el caché centralizado de reseñas.
+  static const _cacheKey = 'all_reviews_cache';
+
+  ReviewRepository(this._connectionProvider)
       : _client = SupabaseConfig.client,
         _retryOptions = const RetryOptions(maxAttempts: 3, delayFactor: Duration(seconds: 1));
+  
+  // --- MÉTODOS PÚBLICOS (API del Repositorio) ---
 
   Future<Review> createReview(Review review) async {
-    if (!await _connectionProvider.isConnected) {
-      throw Exception('No hay conexión a internet');
-    }
-
+    await _guardConnection(); // 3ra mejora: Guard clause
+    
+    // El modelo freezed genera el toJson(), no necesitas el parámetro includeId
     final response = await _retryOptions.retry(
       () => _client.from('reviews').insert(review.toJson()).select().single(),
     );
-
+    
     final newReview = Review.fromJson(response);
-    await _cacheReview(newReview);
+    await _addOrUpdateCache([newReview]); // Actualiza el caché central
     return newReview;
   }
 
-Future<Review> updateReview(Review review) async {
-  if (!await _connectionProvider.isConnected) {
-    throw Exception('No hay conexión a internet');
+  Future<Review> updateReview(Review review) async {
+    await _guardConnection();
+    
+    if (review.reviewId == null) {
+      throw Exception('El reviewId no puede ser null para una actualización.');
+    }
+
+    final response = await _retryOptions.retry(
+      () => _client
+          .from('reviews')
+          .update(review.toJson())
+          .eq('review_id', review.reviewId!)
+          .select()
+          .single(),
+    );
+
+    final updatedReview = Review.fromJson(response);
+    await _addOrUpdateCache([updatedReview]); // Actualiza el caché central
+    return updatedReview;
   }
-
-  if (review.reviewId == null) {
-    throw Exception('El reviewId no puede ser null para una actualización.');
-  }
-
-  final response = await _retryOptions.retry(
-    () => _client
-        .from('reviews')
-        .update(review.toJson())
-        .eq('review_id', review.reviewId!)
-        .select()
-        .single(),
-  );
-
-  final updatedReview = Review.fromJson(response);
-  await _cacheReview(updatedReview);
-  return updatedReview;
-}
-
 
   Future<void> deleteReview(int reviewId) async {
-    if (!await _connectionProvider.isConnected) {
-      throw Exception('No hay conexión a internet');
-    }
+    await _guardConnection();
 
     await _retryOptions.retry(
       () => _client.from('reviews').delete().eq('review_id', reviewId),
     );
 
-    await _removeCachedReview(reviewId);
+    await _removeReviewFromCache(reviewId); // Elimina del caché central
   }
 
   Future<Review> getReviewById(int reviewId) async {
+    // Si no hay conexión, intenta obtener del caché.
     if (!await _connectionProvider.isConnected) {
-      return _getCachedReview(reviewId);
+      final cachedReviews = await _getReviewsFromCache();
+      final review = cachedReviews[reviewId];
+      if (review == null) throw Exception('Reseña no encontrada en caché');
+      return review;
     }
 
+    // Si hay conexión, obtiene de Supabase y actualiza el caché.
     try {
       final response = await _retryOptions.retry(
         () => _client.from('reviews').select().eq('review_id', reviewId).single(),
       );
-
       final review = Review.fromJson(response);
-      await _cacheReview(review);
+      await _addOrUpdateCache([review]); // Actualiza el caché central
       return review;
     } catch (e) {
-      debugPrint('❌ Error obteniendo reseña: $e');
-      return _getCachedReview(reviewId);
+      debugPrint('❌ Error obteniendo reseña de la API, intentando desde caché: $e');
+      final cachedReviews = await _getReviewsFromCache();
+      final review = cachedReviews[reviewId];
+      if (review == null) throw Exception('Reseña no encontrada en API ni en caché');
+      return review;
     }
   }
 
   Future<List<Review>> getReviewsByStay(int stayId) async {
-    if (!await _connectionProvider.isConnected) {
-      return _getCachedStayReviews(stayId);
-    }
+    final cachedReviews = await _getReviewsFromCache();
 
+    // Si no hay conexión, filtra desde el caché.
+    if (!await _connectionProvider.isConnected) {
+      return cachedReviews.values.where((r) => r.stayId == stayId).toList();
+    }
+    
+    // Si hay conexión, obtiene de Supabase, actualiza el caché y luego filtra.
     try {
       final response = await _retryOptions.retry(
         () => _client.from('reviews').select().eq('stay_id', stayId),
       );
-
       final reviews = (response as List).map((json) => Review.fromJson(json)).toList();
-      await _cacheStayReviews(stayId, reviews);
+      await _addOrUpdateCache(reviews); // Actualiza el caché central
       return reviews;
     } catch (e) {
-      debugPrint('❌ Error obteniendo reseñas de alojamiento: $e');
-      return _getCachedStayReviews(stayId);
+      debugPrint('❌ Error obteniendo reseñas de estancia, filtrando desde caché: $e');
+      return cachedReviews.values.where((r) => r.stayId == stayId).toList();
     }
   }
 
   Future<List<Review>> getReviewsByUser(String userId) async {
+    final cachedReviews = await _getReviewsFromCache();
+
     if (!await _connectionProvider.isConnected) {
-      return _getCachedUserReviews(userId);
+      return cachedReviews.values.where((r) => r.userId == userId).toList();
     }
 
     try {
       final response = await _retryOptions.retry(
         () => _client.from('reviews').select().eq('user_id', userId),
       );
-
       final reviews = (response as List).map((json) => Review.fromJson(json)).toList();
-      await _cacheUserReviews(userId, reviews);
+      await _addOrUpdateCache(reviews);
       return reviews;
     } catch (e) {
-      debugPrint('❌ Error obteniendo reseñas de usuario: $e');
-      return _getCachedUserReviews(userId);
+      debugPrint('❌ Error obteniendo reseñas de usuario, filtrando desde caché: $e');
+      return cachedReviews.values.where((r) => r.userId == userId).toList();
     }
   }
 
-  // Caché methods
-  Future<void> _cacheReview(Review review) async {
-    final prefs = await SharedPreferences.getInstance();
-    final reviews = await _getCachedReviews();
-    final index = reviews.indexWhere((r) => r.reviewId == review.reviewId);
-    
-    if (index != -1) {
-      reviews[index] = review;
-    } else {
-      reviews.add(review);
+  // --- MÉTODOS PRIVADOS (Lógica Interna) ---
+
+  /// 3ra mejora: Cláusula de guarda para verificar la conexión y evitar repetir código.
+  Future<void> _guardConnection() async {
+    if (!await _connectionProvider.isConnected) {
+      throw Exception('No hay conexión a internet. La operación no puede continuar.');
     }
-    
-    await prefs.setString('cached_reviews', jsonEncode(reviews.map((r) => r.toJson()).toList()));
   }
 
-  Future<void> _removeCachedReview(int reviewId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final reviews = await _getCachedReviews();
-    reviews.removeWhere((r) => r.reviewId == reviewId);
-    await prefs.setString('cached_reviews', jsonEncode(reviews.map((r) => r.toJson()).toList()));
-  }
-
-  Future<List<Review>> _getCachedReviews() async {
+  /// Lee el caché central y lo devuelve como un Mapa para acceso rápido.
+  Future<Map<int, Review>> _getReviewsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('cached_reviews');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Review.fromJson(json))
-          .toList();
+      final data = prefs.getString(_cacheKey);
+      if (data == null) return {};
+
+      final list = (jsonDecode(data) as List).map((json) => Review.fromJson(json));
+      return {for (var review in list) review.reviewId!: review};
     } catch (e) {
-      debugPrint('⚠️ Error recuperando caché de reseñas: $e');
-      return [];
+      debugPrint('⚠️ Error recuperando el caché de reseñas: $e');
+      return {}; // Devuelve un mapa vacío en caso de error.
     }
   }
-
-  Future<Review> _getCachedReview(int reviewId) async {
-    final reviews = await _getCachedReviews();
-    return reviews.firstWhere((r) => r.reviewId == reviewId, orElse: () => throw Exception('Reseña no encontrada en caché'));
-  }
-
-  Future<void> _cacheStayReviews(int stayId, List<Review> reviews) async {
+  
+  /// Escribe un mapa de reseñas en el caché central.
+  Future<void> _saveReviewsToCache(Map<int, Review> reviews) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('stay_reviews_$stayId', jsonEncode(reviews.map((r) => r.toJson()).toList()));
+    final listToStore = reviews.values.map((r) => r.toJson()).toList();
+    await prefs.setString(_cacheKey, jsonEncode(listToStore));
   }
 
-  Future<List<Review>> _getCachedStayReviews(int stayId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('stay_reviews_$stayId');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Review.fromJson(json))
-          .toList();
-    } catch (e) {
-      debugPrint('⚠️ Error recuperando caché de reseñas de alojamiento: $e');
-      return [];
+  /// Agrega o actualiza una lista de reseñas en el caché central.
+  Future<void> _addOrUpdateCache(List<Review> reviews) async {
+    final cachedMap = await _getReviewsFromCache();
+    for (var review in reviews) {
+      if (review.reviewId != null) {
+        cachedMap[review.reviewId!] = review;
+      }
     }
+    await _saveReviewsToCache(cachedMap);
   }
 
-  Future<void> _cacheUserReviews(String userId, List<Review> reviews) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_reviews_$userId', jsonEncode(reviews.map((r) => r.toJson()).toList()));
-  }
-
-  Future<List<Review>> _getCachedUserReviews(String userId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('user_reviews_$userId');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Review.fromJson(json))
-          .toList();
-    } catch (e) {
-      debugPrint('⚠️ Error recuperando caché de reseñas de usuario: $e');
-      return [];
-    }
+  /// Elimina una reseña del caché central por su ID.
+  Future<void> _removeReviewFromCache(int reviewId) async {
+    final cachedMap = await _getReviewsFromCache();
+    cachedMap.remove(reviewId);
+    await _saveReviewsToCache(cachedMap);
   }
 }
