@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:aureviarooms/auth/connection_provider.dart';
+import 'package:aureviarooms/provider/connection_provider.dart';
 import 'package:aureviarooms/data/services/local_storage_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:retry/retry.dart';
@@ -29,7 +29,7 @@ class UserModelRepository {
     }
 
     final response = await _retryOptions.retry(
-      () => _client.from('user_model').insert(user.toJson()).select().single(),
+      () => _client.from('users').insert(user.toJson()).select().single(),
     );
 
     final newUser = UserModel.fromJson(response);
@@ -43,7 +43,7 @@ class UserModelRepository {
     }
 
     final response = await _retryOptions.retry(
-      () => _client.from('user_model')
+      () => _client.from('users')
           .update(user.toJson())
           .eq('auth_user_id', user.authUserId)
           .select()
@@ -61,7 +61,7 @@ class UserModelRepository {
     }
 
     await _retryOptions.retry(
-      () => _client.from('user_model').delete().eq('auth_user_id', authUserId),
+      () => _client.from('users').delete().eq('auth_user_id', authUserId),
     );
 
     await _removeCachedUser(authUserId);
@@ -74,7 +74,7 @@ class UserModelRepository {
 
     try {
       final response = await _retryOptions.retry(
-        () => _client.from('user_model').select().eq('auth_user_id', authUserId).single(),
+        () => _client.from('users').select().eq('auth_user_id', authUserId).single(),
       );
 
       final user = UserModel.fromJson(response);
@@ -99,7 +99,7 @@ class UserModelRepository {
 
     try {
       final response = await _retryOptions.retry(
-        () => _client.from('user_model').select().or('username.ilike.%$query%,email.ilike.%$query%'),
+        () => _client.from('users').select().or('username.ilike.%$query%,email.ilike.%$query%'),
       );
 
       final users = (response as List).map((json) => UserModel.fromJson(json)).toList();

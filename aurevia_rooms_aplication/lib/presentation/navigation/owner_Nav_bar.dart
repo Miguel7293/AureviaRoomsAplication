@@ -1,15 +1,17 @@
-import 'package:flutter/material.dart';
 import 'package:aureviarooms/presentation/screens/owner/main_owner_screen.dart';
 import 'package:aureviarooms/presentation/screens/owner/profile_owner_screen.dart';
+import 'package:flutter/material.dart';
 
-class UserNavBar extends StatefulWidget {
-  const UserNavBar({super.key});
+
+
+class OwnerNavBar extends StatefulWidget {
+  const OwnerNavBar({super.key});
 
   @override
-  State<UserNavBar> createState() => _UserNavBarState();
+  State<OwnerNavBar> createState() => _OwnerNavBarState();
 }
 
-class _UserNavBarState extends State<UserNavBar> {
+class _OwnerNavBarState extends State<OwnerNavBar> {
   int _currentIndex = 0; // Empezar en pantalla principal (Inicio)
 
   final List<Widget> _screens = [

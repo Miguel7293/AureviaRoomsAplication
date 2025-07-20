@@ -1,17 +1,12 @@
-// stay_repository.dart
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
 import 'package:aureviarooms/data/models/stay_model.dart';
 import 'package:aureviarooms/data/services/local_storage_manager.dart';
 import 'package:aureviarooms/provider/connection_provider.dart';
 import 'package:flutter/foundation.dart';
-
 import 'package:retry/retry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../config/supabase/supabase_config.dart';
 
 class StayRepository {
@@ -38,29 +33,28 @@ class StayRepository {
     return newStay;
   }
 
-Future<Stay> updateStay(Stay stay) async {
-  if (!await _connectionProvider.isConnected) {
-    throw Exception('No hay conexión a internet');
+  Future<Stay> updateStay(Stay stay) async {
+    if (!await _connectionProvider.isConnected) {
+      throw Exception('No hay conexión a internet');
+    }
+
+    if (stay.stayId == null) {
+      throw Exception('El stayId no puede ser null para una actualización.');
+    }
+
+    final response = await _retryOptions.retry(
+      () => _client
+          .from('stays')
+          .update(stay.toJson())
+          .eq('stay_id', stay.stayId!)
+          .select()
+          .single(),
+    );
+
+    final updatedStay = Stay.fromJson(response);
+    await _cacheStay(updatedStay);
+    return updatedStay;
   }
-
-  if (stay.stayId == null) {
-    throw Exception('El stayId no puede ser null para una actualización.');
-  }
-
-  final response = await _retryOptions.retry(
-    () => _client
-        .from('stays')
-        .update(stay.toJson())
-        .eq('stay_id', stay.stayId!)
-        .select()
-        .single(),
-  );
-
-  final updatedStay = Stay.fromJson(response);
-  await _cacheStay(updatedStay);
-  return updatedStay;
-}
-
 
   Future<void> deleteStay(int stayId) async {
     if (!await _connectionProvider.isConnected) {
@@ -94,7 +88,9 @@ Future<Stay> updateStay(Stay stay) async {
   }
 
   Future<List<Stay>> getStaysByOwner(String ownerId) async {
+    debugPrint('Fetching stays for ownerId: $ownerId (type: ${ownerId.runtimeType})');
     if (!await _connectionProvider.isConnected) {
+      debugPrint('No internet connection, returning cached stays');
       return _getCachedOwnerStays(ownerId);
     }
 
@@ -103,7 +99,17 @@ Future<Stay> updateStay(Stay stay) async {
         () => _client.from('stays').select().eq('owner_id', ownerId),
       );
 
-      final stays = (response as List).map((json) => Stay.fromJson(json)).toList();
+      debugPrint('Supabase response type: ${response.runtimeType}, content: $response');
+      if (response is! List) {
+        throw Exception('Expected List response, got ${response.runtimeType}');
+      }
+
+      final stays = response.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic>, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
       await _cacheOwnerStays(ownerId, stays);
       return stays;
     } catch (e) {
@@ -122,7 +128,17 @@ Future<Stay> updateStay(Stay stay) async {
         () => _client.from('stays').select().ilike('name', '%$query%'),
       );
 
-      final stays = (response as List).map((json) => Stay.fromJson(json)).toList();
+      debugPrint('Search response type: ${response.runtimeType}, content: $response');
+      if (response is! List) {
+        throw Exception('Expected List response, got ${response.runtimeType}');
+      }
+
+      final stays = response.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic>, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
       await _cacheSearchResults(query, stays);
       return stays;
     } catch (e) {
@@ -131,18 +147,61 @@ Future<Stay> updateStay(Stay stay) async {
     }
   }
 
+  // --- NUEVO MÉTODO A AÑADIR ---
+  Future<List<Stay>> getAllPublishedStays() async {
+    if (!await _connectionProvider.isConnected) {
+      // Puedes optar por devolver una lista vacía, una caché genérica o lanzar una excepción.
+      // Por simplicidad, y para esta vista, si no hay conexión, devolvemos lo que hay en caché genérica.
+      debugPrint('No hay conexión a internet, intentando obtener alojamientos publicados de la caché general.');
+      // Ojo: _getCachedStays() devuelve TODOS los stays cacheados, no solo los publicados.
+      // Para un comportamiento 100% correcto offline de "solo publicados", necesitarías
+      // una caché específica para "todos los publicados". Por ahora, es un compromiso.
+      return (await _getCachedStays()).where((s) => s.status == 'published').toList();
+    }
+
+    try {
+      final response = await _retryOptions.retry(
+        () => _client
+            .from('stays')
+            .select() // Select all columns
+            .eq('status', 'published'), // Filter by 'published' status
+      );
+
+      debugPrint('Supabase response for published stays: ${response.runtimeType}, content: $response');
+      if (response is! List) {
+        throw Exception('Expected List response for published stays, got ${response.runtimeType}');
+      }
+
+      final stays = response.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic> in published stays, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
+
+      // Opcional: Podrías querer cachear estos 'published stays' por separado si la lista es muy grande
+      // y quieres un acceso offline muy específico a "todos los publicados".
+      // Por ahora, el _cacheStay individual y _getCachedStays general son suficientes.
+      return stays;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo todos los alojamientos publicados: $e');
+      // Propagar el error para que el FutureBuilder en la UI lo maneje.
+      rethrow;
+    }
+  }
+  // --- FIN DEL NUEVO MÉTODO ---
+
+
   // Caché methods
   Future<void> _cacheStay(Stay stay) async {
     final prefs = await SharedPreferences.getInstance();
     final stays = await _getCachedStays();
     final index = stays.indexWhere((s) => s.stayId == stay.stayId);
-    
     if (index != -1) {
       stays[index] = stay;
     } else {
       stays.add(stay);
     }
-    
     await prefs.setString('cached_stays', jsonEncode(stays.map((s) => s.toJson()).toList()));
   }
 
@@ -158,10 +217,18 @@ Future<Stay> updateStay(Stay stay) async {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('cached_stays');
       if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Stay.fromJson(json))
-          .toList();
+
+      final decoded = jsonDecode(data);
+      if (decoded is! List) {
+        debugPrint('⚠️ Cached stays data is not a List: $decoded');
+        return [];
+      }
+      return decoded.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic> in cached stays, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
     } catch (e) {
       debugPrint('⚠️ Error recuperando caché de alojamientos: $e');
       return [];
@@ -182,11 +249,22 @@ Future<Stay> updateStay(Stay stay) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('owner_stays_$ownerId');
-      if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Stay.fromJson(json))
-          .toList();
+      if (data == null) {
+        debugPrint('No cached data for ownerId: $ownerId');
+        return [];
+      }
+
+      final decoded = jsonDecode(data);
+      if (decoded is! List) {
+        debugPrint('⚠️ Cached owner stays data is not a List: $decoded');
+        return [];
+      }
+      return decoded.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic> in cached owner stays, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
     } catch (e) {
       debugPrint('⚠️ Error recuperando caché de alojamientos de propietario: $e');
       return [];
@@ -203,10 +281,18 @@ Future<Stay> updateStay(Stay stay) async {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('search_stays_${query.toLowerCase()}');
       if (data == null) return [];
-      
-      return (jsonDecode(data) as List)
-          .map((json) => Stay.fromJson(json))
-          .toList();
+
+      final decoded = jsonDecode(data);
+      if (decoded is! List) {
+        debugPrint('⚠️ Cached search results data is not a List: $decoded');
+        return [];
+      }
+      return decoded.map((json) {
+        if (json is! Map<String, dynamic>) {
+          throw Exception('Expected Map<String, dynamic> in cached search results, got ${json.runtimeType}');
+        }
+        return Stay.fromJson(json);
+      }).toList();
     } catch (e) {
       debugPrint('⚠️ Error recuperando caché de búsqueda: $e');
       return [];
