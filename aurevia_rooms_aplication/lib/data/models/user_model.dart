@@ -1,51 +1,23 @@
-class UserModel {
-  final String authUserId;
-  final String username;
-  final String userType;
-  final String? preferredLanguage;
-  final Map<String, dynamic>? preferredTheme;
-  final String? profileImageUrl;
-  final String email;
-  final String? phoneNumber;
-  final DateTime createdAt;
+// lib/data/models/user_model.dart
 
-  UserModel({
-    required this.authUserId,
-    required this.username,
-    required this.userType,
-    this.preferredLanguage,
-    this.preferredTheme,
-    this.profileImageUrl,
-    required this.email,
-    this.phoneNumber,
-    required this.createdAt,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
-      authUserId: json['auth_user_id'],
-      username: json['username'],
-      userType: json['user_type'],
-      preferredLanguage: json['preferred_language'],
-      preferredTheme: json['preferred_theme'],
-      profileImageUrl: json['profile_image_url'],
-      email: json['email'],
-      phoneNumber: json['phone_number'],
-      createdAt: DateTime.parse(json['created_at']),
-    );
-  }
+part 'user_model.freezed.dart';
+part 'user_model.g.dart';
 
-  Map<String, dynamic> toJson() {
-    return {
-      'auth_user_id': authUserId,
-      'username': username,
-      'user_type': userType,
-      'preferred_language': preferredLanguage,
-      'preferred_theme': preferredTheme,
-      'profile_image_url': profileImageUrl,
-      'email': email,
-      'phone_number': phoneNumber,
-      'created_at': createdAt.toIso8601String(),
-    };
-  }
+@freezed
+class UserModel with _$UserModel {
+  const factory UserModel({
+    @JsonKey(name: 'auth_user_id') required String authUserId,
+    required String username,
+    @JsonKey(name: 'user_type') required String userType,
+    @JsonKey(name: 'preferred_language') String? preferredLanguage,
+    @JsonKey(name: 'preferred_theme') Map<String, dynamic>? preferredTheme,
+    @JsonKey(name: 'profile_image_url') String? profileImageUrl,
+    required String email,
+    @JsonKey(name: 'phone_number') String? phoneNumber,
+    @JsonKey(name: 'created_at') required DateTime createdAt,
+  }) = _UserModel;
+
+  factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);
 }

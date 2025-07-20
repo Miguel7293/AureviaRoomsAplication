@@ -27,7 +27,6 @@ void main() async {
         Provider(
           create: (context) => UserModelRepository(
             context.read<ConnectionProvider>(),
-            context.read<LocalStorageManager>(),
           ),
         ),
         ChangeNotifierProxyProvider2<ConnectionProvider, UserModelRepository, AuthProvider>(
