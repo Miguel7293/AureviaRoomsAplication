@@ -15,7 +15,7 @@ class RoomRateService {
     final repo = context.read<RoomRateRepository>();
     final newRate = RoomRate(
       roomId: roomId,
-      rateType: rateType,
+      rateType: 'day',
       price: price,
       createdAt: DateTime.now(),
     );

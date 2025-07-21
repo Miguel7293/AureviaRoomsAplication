@@ -26,7 +26,11 @@ dependencies:
   google_maps_flutter_android: ^2.17.0
   freezed_annotation: ^2.4.1 # O la versión más reciente
   json_annotation: ^4.9.0    # O la versión más reciente
-  
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/Logo.png"
 
 dev_dependencies:
   flutter_test:
@@ -35,9 +39,12 @@ dev_dependencies:
   build_runner: ^2.4.11 # O la versión más reciente
   freezed: ^2.5.2        # O la versión más reciente
   json_serializable: ^6.8.0 # O la versión más reciente
+  flutter_launcher_icons: ^0.13.1
+
 
 flutter:
   uses-material-design: true
   assets:
+    - assets/Logo_Nombre.png
     - assets/Logo_Nombre.png
     - .env
