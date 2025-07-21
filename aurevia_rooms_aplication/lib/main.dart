@@ -1,3 +1,5 @@
+// main.dart
+
 import 'package:aureviarooms/data/services/booking_repository.dart';
 import 'package:aureviarooms/data/services/promotion_repository.dart';
 import 'package:aureviarooms/data/services/review_repository.dart';
@@ -10,10 +12,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/services/local_storage_manager.dart';
 import 'package:aureviarooms/app/app.dart'; // Tu widget principal MaterialApp
+import 'package:aureviarooms/app/app_theme.dart'; // <--- THIS IS CORRECT
 import 'package:aureviarooms/config/supabase/supabase_config.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
 import 'package:aureviarooms/provider/connection_provider.dart';
-import 'package:aureviarooms/provider/theme_provider.dart'; // ¡Importa el nuevo ThemeProvider!
+import 'package:aureviarooms/provider/theme_provider.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +28,6 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ConnectionProvider()),
-        // Añade el ThemeProvider aquí
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider(create: (_) => LocalStorageManager()),
         Provider(
@@ -73,7 +76,26 @@ void main() async {
           ),
         ),
       ],
-      child: const App(), // Aquí es donde tu widget App consume los temas
+      child: const MyAppWrapper(),
     ),
   );
+}
+
+class MyAppWrapper extends StatelessWidget {
+  const MyAppWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return MaterialApp(
+      title: 'AureviaRooms',
+      debugShowCheckedModeBanner: false,
+      themeMode: themeProvider.themeMode,
+      // Aquí usamos la clase AppTheme que importamos
+      theme: AppTheme.lightTheme, // Usa tu tema claro
+      darkTheme: AppTheme.darkFuturisticTheme, // Usa tu tema oscuro futurista
+      home: const App(),
+    );
+  }
 }
