@@ -14,7 +14,7 @@ class AuthProvider with ChangeNotifier {
   String? _userId;
   User? _currentUser;
   UserModel? _appUser;
-  bool _isInitializingAuth = true; // <--- Nuevo flag de inicialización
+  bool _isInitializingAuth = true;
   final SupabaseClient _client = SupabaseConfig.client;
   late ConnectionProvider _connectionProvider;
   final UserModelRepository _userModelRepository;
@@ -23,7 +23,7 @@ class AuthProvider with ChangeNotifier {
   StreamSubscription<AuthState>? _authSubscription;
 
   AuthProvider(this._connectionProvider, this._userModelRepository) {
-    _initializeAuth(); // <--- Llamada a un nuevo método de inicialización
+    _initializeAuth();
   }
 
   bool get isAuthenticated => _isAuthenticated;
@@ -31,18 +31,27 @@ class AuthProvider with ChangeNotifier {
   User? get currentUser => _currentUser;
   UserModel? get appUser => _appUser;
   String? get userType => _appUser?.userType;
-  bool get isInitializingAuth => _isInitializingAuth; // <--- Getter para el flag
+  bool get isInitializingAuth => _isInitializingAuth;
+
+  Future<void> setUser(UserModel updatedUser) async {
+    try {
+      await _userModelRepository.updateUser(updatedUser);
+      _appUser = updatedUser;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating user: $e');
+      throw e;
+    }
+  }
 
   void updateConnection(ConnectionProvider newConnection) {
     _connectionProvider = newConnection;
   }
 
-  // Nuevo método para manejar la inicialización del AuthProvider
   Future<void> _initializeAuth() async {
-    _isInitializingAuth = true; // Empieza en true
-    notifyListeners(); // Notifica que la inicialización ha comenzado
+    _isInitializingAuth = true;
+    notifyListeners();
 
-    // Escucha cambios de estado de autenticación de Supabase
     _authSubscription = _client.auth.onAuthStateChange.listen((data) async {
       final oldUserId = _userId;
       _currentUser = data.session?.user;
@@ -50,27 +59,20 @@ class AuthProvider with ChangeNotifier {
       _isAuthenticated = _currentUser != null;
 
       if (_isAuthenticated) {
-        // Carga _appUser solo si el ID de usuario ha cambiado o es una nueva sesión
         if (_userId != oldUserId || _appUser == null) {
-          await _loadAppUser(); // Asegura que _appUser se carga antes de notificar
+          await _loadAppUser();
         }
       } else {
-        _appUser = null; // Limpia _appUser si no está autenticado
+        _appUser = null;
       }
 
-      // Una vez que el estado inicial se ha resuelto
       if (_isInitializingAuth) {
-        _isInitializingAuth = false; // La inicialización ha terminado
+        _isInitializingAuth = false;
       }
-      notifyListeners(); // Notifica una vez que todos los estados están actualizados
+      notifyListeners();
     });
 
-    // También podemos verificar la sesión actual de inmediato al inicio
-    // para acelerar la inicialización si hay una sesión existente.
     if (_client.auth.currentUser != null) {
-      // Forzar una carga inicial si ya hay un usuario logueado al inicio
-      // Esto hará que el listener de onAuthStateChange se dispare con la sesión actual
-      // o se resuelva más rápido.
       _currentUser = _client.auth.currentUser;
       _userId = _currentUser?.id;
       _isAuthenticated = true;
@@ -78,12 +80,10 @@ class AuthProvider with ChangeNotifier {
         await _loadAppUser();
       }
     } else {
-      // Si no hay usuario al inicio, terminar la inicialización aquí
       _isInitializingAuth = false;
       notifyListeners();
     }
   }
-
 
   Future<void> _loadAppUser() async {
     if (_userId == null) {
@@ -189,3 +189,4 @@ class AuthProvider with ChangeNotifier {
     super.dispose();
   }
 }
+

@@ -9,10 +9,10 @@ class ConnectionProvider with ChangeNotifier {
   bool _hasGoodSpeed = true;
   final Connectivity _connectivity = Connectivity();
   Timer? _autoHideTimer;
-  
+
   static const double MIN_SPEED_KBPS = 1.0;
 
-  bool get isConnected => _isConnected; 
+  bool get isConnected => _isConnected;
   bool get showBanner => _showBanner;
   bool get hasGoodSpeed => _hasGoodSpeed;
 
@@ -29,17 +29,17 @@ class ConnectionProvider with ChangeNotifier {
     try {
       final result = await _connectivity.checkConnectivity();
       final newConnected = result != ConnectivityResult.none;
-      
+
       bool newGoodSpeed = false;
       if (newConnected) {
         newGoodSpeed = await _checkConnectionSpeed();
       }
-      
+
       if (newConnected != _isConnected || newGoodSpeed != _hasGoodSpeed) {
         _isConnected = newConnected;
         _hasGoodSpeed = newGoodSpeed;
         _updateBannerState();
-        
+
         _autoHideTimer?.cancel();
         if (_isConnected && _hasGoodSpeed) {
           _autoHideTimer = Timer(const Duration(seconds: 3), () {
@@ -59,18 +59,18 @@ class ConnectionProvider with ChangeNotifier {
     try {
       const timeoutDuration = Duration(seconds: 5);
       final stopwatch = Stopwatch()..start();
-      
+
       final request = await HttpClient()
         .getUrl(Uri.parse('https://www.gstatic.com/generate_204'))
         .timeout(timeoutDuration);
-      
+
       final response = await request.close();
       await response.drain();
       stopwatch.stop();
 
       const estimatedSizeKB = 2.0;
       final speed = estimatedSizeKB / (stopwatch.elapsedMilliseconds / 1000);
-      
+
       return speed >= MIN_SPEED_KBPS;
     } catch (e) {
       return false;
@@ -96,7 +96,7 @@ class ConnectionProvider with ChangeNotifier {
     _showBanner = true;
     notifyListeners();
     await _checkConnection();
-    
+
     _autoHideTimer?.cancel();
     if (_isConnected && _hasGoodSpeed) {
       _autoHideTimer = Timer(const Duration(seconds: 3), () {
@@ -105,6 +105,26 @@ class ConnectionProvider with ChangeNotifier {
           notifyListeners();
         }
       });
+    }
+  }
+
+  // Nuevo método para actualizar el estado de conexión manualmente
+  void updateConnectionStatus(bool status) {
+    if (_isConnected != status) {
+      _isConnected = status;
+      _hasGoodSpeed = status ? _hasGoodSpeed : false; // Si se pierde la conexión, asumimos baja velocidad
+      _updateBannerState();
+
+      _autoHideTimer?.cancel();
+      if (_isConnected && _hasGoodSpeed) {
+        _autoHideTimer = Timer(const Duration(seconds: 3), () {
+          if (_isConnected && _hasGoodSpeed && _showBanner) {
+            _showBanner = false;
+            notifyListeners();
+          }
+        });
+      }
+      notifyListeners();
     }
   }
 

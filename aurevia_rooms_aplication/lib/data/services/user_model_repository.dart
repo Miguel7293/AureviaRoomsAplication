@@ -1,4 +1,4 @@
-// lib/data/services/user_model_repository.dart
+// archivo: user_model_repository.dart
 
 import 'dart:async';
 import 'dart:convert';
@@ -34,10 +34,25 @@ class UserModelRepository {
   // --- UPDATE ---
   Future<UserModel> updateUser(UserModel user) async {
     await _guardConnection();
-    final response = await _retryOptions.retry(() => _client.from('users').update(user.toJson()).eq('auth_user_id', user.authUserId).select().single());
-    final updatedUser = UserModel.fromJson(response);
-    await _addOrUpdateCache([updatedUser]);
-    return updatedUser;
+    debugPrint('Intentando actualizar usuario con authUserId: ${user.authUserId}');
+    debugPrint('Datos a enviar: username=${user.username}, phone_number=${user.phoneNumber}, profile_image_url=${user.profileImageUrl}');
+    try {
+      final response = await _retryOptions.retry(
+        () => _client.from('users').update({
+          'username': user.username,
+          'phone_number': user.phoneNumber,
+          // 'updated_at': DateTime.now().toIso8601String(), // <-- ¡ELIMINA O COMENTA ESTA LÍNEA!
+          if (user.profileImageUrl != null) 'profile_image_url': user.profileImageUrl,
+        }).eq('auth_user_id', user.authUserId).select().single(),
+      );
+      final updatedUser = UserModel.fromJson(response);
+      debugPrint('Usuario actualizado en Supabase: ${updatedUser.username}');
+      await _addOrUpdateCache([updatedUser]);
+      return updatedUser;
+    } catch (e) {
+      debugPrint('❌ Error al actualizar usuario en Supabase: $e');
+      throw e; // Re-lanza la excepción para que se maneje en EditProfileScreen
+    }
   }
 
   // --- DELETE ---
@@ -76,7 +91,7 @@ class UserModelRepository {
   Future<List<UserModel>> searchUsers(String query) async {
     final lowerCaseQuery = query.toLowerCase();
     final cachedUsers = await _getUsersFromCache();
-    
+
     bool searchFilter(UserModel u) =>
         u.username.toLowerCase().contains(lowerCaseQuery) ||
         u.email.toLowerCase().contains(lowerCaseQuery);

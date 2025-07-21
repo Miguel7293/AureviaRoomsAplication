@@ -3,16 +3,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:aureviarooms/core/theme/app_theme.dart';
+import 'package:aureviarooms/core/theme/app_theme.dart'; // Tu archivo de temas existente
 import 'package:aureviarooms/presentation/navigation/owner_nav_bar.dart';
 import 'package:aureviarooms/presentation/navigation/user_nav_bar.dart';
 import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
-import 'package:aureviarooms/presentation/screens/splash_screen.dart'; 
+import 'package:aureviarooms/presentation/screens/splash_screen.dart';
 import 'package:aureviarooms/presentation/screens/sign/choosing_role_screen.dart';
 import 'package:aureviarooms/presentation/screens/sign/waiting_approval_screen.dart';
-
-
+import 'package:aureviarooms/provider/theme_provider.dart'; // ¡Importa el ThemeProvider!
 
 
 class UserTypeGate extends StatelessWidget {
@@ -57,10 +56,16 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Accede al ThemeProvider para obtener el modo de tema actual
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'AureviaRooms',
-      theme: AppTheme.lightTheme,
+      // Usa tus temas definidos en AppTheme y controla el modo
+      theme: AppTheme.lightTheme, // Tema claro
+      darkTheme: AppTheme.darkTheme, // ¡Necesitas definir esto en app_theme.dart!
+      themeMode: themeProvider.themeMode, // Controla el modo del tema (claro/oscuro)
       home: const UserTypeGate(),
       routes: {
         '/login': (context) => const LoginScreen(),
