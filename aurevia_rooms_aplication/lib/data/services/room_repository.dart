@@ -165,6 +165,32 @@ class RoomRepository {
     cachedMap.remove(roomId);
     await _saveRoomsToCache(cachedMap);
   }
+  
+  Future<List<Room>> getRoomsByStayIds(List<int> stayIds) async {
+  if (stayIds.isEmpty) return [];
+  final cachedRooms = await _getRoomsFromCache();
+
+  // Filtrado offline para modo sin conexión
+  if (!await _connectionProvider.isConnected) {
+    return cachedRooms.values.where((r) => stayIds.contains(r.stayId)).toList();
+  }
+
+  try {
+    final response = await _retryOptions.retry(
+      () => _client
+          .from('rooms')
+          .select()
+          .inFilter('stay_id', stayIds), // ✅ Filtra varios stays
+    );
+
+    final rooms = (response as List).map((json) => Room.fromJson(json)).toList();
+    await _addOrUpdateCache(rooms);
+    return rooms;
+  } catch (e) {
+    debugPrint('❌ Error obteniendo rooms por stayIds, usando caché: $e');
+    return cachedRooms.values.where((r) => stayIds.contains(r.stayId)).toList();
+  }
+}
 
 
 }

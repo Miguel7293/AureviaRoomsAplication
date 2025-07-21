@@ -25,60 +25,68 @@ void main() async {
   await SupabaseConfig.initialize();
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ConnectionProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        Provider(create: (_) => LocalStorageManager()),
-        Provider(
-          create: (context) => UserModelRepository(
-            context.read<ConnectionProvider>(),
-          ),
+  MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => ConnectionProvider()),
+      ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      Provider(create: (_) => LocalStorageManager()),
+
+      // Primero repositorios base
+      Provider(
+        create: (context) => StayRepository(
+          context.read<ConnectionProvider>(),
         ),
-        ChangeNotifierProxyProvider2<ConnectionProvider, UserModelRepository, AuthProvider>(
-          create: (context) => AuthProvider(
-            context.read<ConnectionProvider>(),
-            context.read<UserModelRepository>(),
-          ),
-          update: (context, connection, userModelRepo, previous) {
-            previous?.updateConnection(connection);
-            return previous!;
-          },
+      ),
+      Provider(
+        create: (context) => RoomRepository(
+          context.read<ConnectionProvider>(),
         ),
-        Provider(
-          create: (context) => BookingRepository(
-            context.read<ConnectionProvider>(),
-          ),
+      ),
+      Provider(
+        create: (context) => PromotionRepository(
+          context.read<ConnectionProvider>(),
         ),
-        Provider(
-          create: (context) => PromotionRepository(
-            context.read<ConnectionProvider>(),
-          ),
+      ),
+      Provider(
+        create: (context) => ReviewRepository(
+          context.read<ConnectionProvider>(),
         ),
-        Provider(
-          create: (context) => ReviewRepository(
-            context.read<ConnectionProvider>(),
-          ),
+      ),
+      Provider(
+        create: (context) => RoomRateRepository(
+          context.read<ConnectionProvider>(),
         ),
-        Provider(
-          create: (context) => StayRepository(
-            context.read<ConnectionProvider>(),
-          ),
+      ),
+      Provider(
+        create: (context) => UserModelRepository(
+          context.read<ConnectionProvider>(),
         ),
-        Provider(
-          create: (context) => RoomRepository(
-            context.read<ConnectionProvider>(),
-          ),
+      ),
+
+      // AuthProvider depende de UserModelRepository
+      ChangeNotifierProxyProvider2<ConnectionProvider, UserModelRepository, AuthProvider>(
+        create: (context) => AuthProvider(
+          context.read<ConnectionProvider>(),
+          context.read<UserModelRepository>(),
         ),
-        Provider(
-          create: (context) => RoomRateRepository(
-            context.read<ConnectionProvider>(),
-          ),
+        update: (context, connection, userModelRepo, previous) {
+          previous?.updateConnection(connection);
+          return previous!;
+        },
+      ),
+
+      // Ahora sí BookingRepository, porque ya existen StayRepository y RoomRepository
+      Provider(
+        create: (context) => BookingRepository(
+          context.read<ConnectionProvider>(),
+          context.read<StayRepository>(),
+          context.read<RoomRepository>(),
         ),
-      ],
-      child: const MyAppWrapper(),
-    ),
-  );
+      ),
+    ],
+    child: const MyAppWrapper(),
+  )
+);
 }
 
 class MyAppWrapper extends StatelessWidget {

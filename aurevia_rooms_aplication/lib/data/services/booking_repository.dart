@@ -2,10 +2,12 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:aureviarooms/data/services/room_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:retry/retry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../data/services/stay_repository.dart';
 
 import '../../config/supabase/supabase_config.dart';
 import '../../provider/connection_provider.dart';
@@ -15,10 +17,12 @@ class BookingRepository {
   final SupabaseClient _client;
   final ConnectionProvider _connectionProvider;
   final RetryOptions _retryOptions;
+  final StayRepository _stayRepository;
+  final RoomRepository _roomRepository;
 
   static const _cacheKey = 'all_bookings_cache';
 
-  BookingRepository(this._connectionProvider)
+  BookingRepository(this._connectionProvider,this._stayRepository,this._roomRepository,)
       : _client = SupabaseConfig.client,
         _retryOptions = const RetryOptions(maxAttempts: 3, delayFactor: Duration(seconds: 1));
 
@@ -144,5 +148,77 @@ class BookingRepository {
     await _addOrUpdateCache(cachedMap.values.toList());
   }
 
-  
+  Future<List<Booking>> getAllPendingBookings() async {
+    final cached = await _getBookingsFromCache();
+
+    if (!await _connectionProvider.isConnected) {
+      return cached.values.where((b) => b.bookingStatus == 'pending').toList();
+    }
+
+    try {
+      final response = await _retryOptions.retry(() =>
+          _client.from('bookings')
+              .select()
+              .eq('booking_status', 'pending')
+      );
+
+      final bookings = (response as List).map((json) => Booking.fromJson(json)).toList();
+
+      await _addOrUpdateCache(bookings);
+
+      return bookings;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo TODAS las reservas pendientes, usando caché: $e');
+      return cached.values.where((b) => b.bookingStatus == 'pending').toList();
+    }
+  }
+
+Future<List<Booking>> getPendingBookingsForOwner(String ownerId) async {
+  try {
+    debugPrint("📡 Obteniendo stays del owner $ownerId...");
+    
+    // 1️⃣ Obtener stays del owner
+    final stays = await _stayRepository.getStaysByOwner(ownerId);
+    final stayIds = stays
+    .map((s) => s.stayId)
+    .whereType<int>() // ✅ elimina nulls
+    .toList();
+
+    if (stayIds.isEmpty) {
+      debugPrint("⚠️ Este owner no tiene stays asociados");
+      return [];
+    }
+
+    debugPrint("✅ Owner tiene ${stayIds.length} stays → $stayIds");
+
+    // 2️⃣ Obtener rooms asociadas a esos stays
+    final rooms = await _roomRepository.getRoomsByStayIds(stayIds);
+    final roomIdsOwner = rooms.map((r) => r.roomId).toSet();
+
+    if (roomIdsOwner.isEmpty) {
+      debugPrint("⚠️ Este owner no tiene rooms asociados a sus stays");
+      return [];
+    }
+
+    debugPrint("✅ Owner tiene ${roomIdsOwner.length} rooms → $roomIdsOwner");
+
+    // 3️⃣ Obtener todos los bookings pendientes (de todos los rooms)
+    final allPendingBookings = await getAllPendingBookings();
+    debugPrint("📊 Total bookings pendientes recibidos: ${allPendingBookings.length}");
+
+    // 4️⃣ Filtrar solo los bookings que correspondan a rooms del owner
+    final filteredBookings = allPendingBookings.where(
+      (booking) => roomIdsOwner.contains(booking.roomId),
+    ).toList();
+
+    debugPrint("✅ Filtrados ${filteredBookings.length} bookings que pertenecen al owner $ownerId");
+
+    return filteredBookings;
+  } catch (e, stack) {
+    debugPrint('❌ Error en getPendingBookingsForOwner: $e');
+    debugPrint(stack.toString());
+    return [];
+  }
+}
+
 }

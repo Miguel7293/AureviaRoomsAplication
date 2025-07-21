@@ -1,5 +1,7 @@
 // lib/presentation/screens/owner/main_owner_screen.dart
 
+import 'package:aureviarooms/presentation/screens/owner/add_stay_screen.dart';
+import 'package:aureviarooms/presentation/screens/owner/stay_owner_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/models/stay_model.dart';
@@ -64,14 +66,31 @@ class _MainOwnerScreenState extends State<MainOwnerScreen> {
           ),
         ],
       ),
-      // ANOTACIÓN: Pasamos el Future al widget de la UI.
-      body: HomeTab(ownerStaysFuture: _ownerStaysFuture),
+      body: HomeTab(
+        ownerStaysFuture: _ownerStaysFuture,
+        onStayTapped: (stay) {
+          // ANOTACIÓN: Navega a la pantalla de detalles del Stay
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => StayOwnerDetailScreen(stay: stay)),
+          ).then((_) => _loadOwnerStays()); // Recarga al volver
+        },
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navegar a la pantalla para crear un nuevo Stay.
+        onPressed: () async {
+          // ANOTACIÓN: Navega a la pantalla para crear un nuevo Stay
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (context) => const AddStayScreen()),
+          );
+          // Si volvemos con 'true', significa que se creó un Stay y debemos recargar la lista.
+          if (result == true) {
+            _loadOwnerStays();
+          }
         },
         backgroundColor: Colors.blueAccent,
         child: const Icon(Icons.add),
+        tooltip: 'Añadir Alojamiento',
       ),
     );
   }
@@ -79,8 +98,9 @@ class _MainOwnerScreenState extends State<MainOwnerScreen> {
 
 class HomeTab extends StatelessWidget {
   final Future<List<Stay>> ownerStaysFuture;
+  final Function(Stay) onStayTapped; 
 
-  const HomeTab({super.key, required this.ownerStaysFuture});
+  const HomeTab({super.key, required this.ownerStaysFuture, required this.onStayTapped});
 
   @override
   Widget build(BuildContext context) {
@@ -159,9 +179,10 @@ class HomeTab extends StatelessWidget {
     );
   }
 
-  // ANOTACIÓN: La tarjeta ahora solo necesita el objeto Stay.
-  Widget _buildStayCard(Stay stay) {
-    return Card(
+Widget _buildStayCard(Stay stay) {
+  return InkWell(
+    onTap: () => onStayTapped(stay), // 👉 Aquí llamas al callback para abrir la pantalla de detalles
+    child: Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -174,9 +195,10 @@ class HomeTab extends StatelessWidget {
               stay.mainImageUrl ?? 'https://via.placeholder.com/400x200?text=AureviaRooms',
               height: 180, width: double.infinity, fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.hotel, size: 50, color: Colors.grey)),
+                height: 180,
+                color: Colors.grey[200],
+                child: const Icon(Icons.hotel, size: 50, color: Colors.grey),
+              ),
             ),
           ),
           Padding(
@@ -189,7 +211,6 @@ class HomeTab extends StatelessWidget {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 const SizedBox(height: 4),
-                // ANOTACIÓN: Mostramos el estado del alojamiento, útil para el dueño.
                 Text(
                   'Estado: ${stay.status}',
                   style: TextStyle(
@@ -197,12 +218,13 @@ class HomeTab extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                // Podrías añadir más información relevante para el dueño aquí.
               ],
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 }

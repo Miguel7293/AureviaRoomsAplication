@@ -1,8 +1,7 @@
 import 'package:aureviarooms/presentation/screens/owner/main_owner_screen.dart';
 import 'package:aureviarooms/presentation/screens/owner/profile_owner_screen.dart';
+import 'package:aureviarooms/presentation/screens/owner/notifications_owner_screen.dart';
 import 'package:flutter/material.dart';
-
-
 
 class OwnerNavBar extends StatefulWidget {
   const OwnerNavBar({super.key});
@@ -12,11 +11,12 @@ class OwnerNavBar extends StatefulWidget {
 }
 
 class _OwnerNavBarState extends State<OwnerNavBar> {
-  int _currentIndex = 0; // Empezar en pantalla principal (Inicio)
+  int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const MainOwnerScreen(),  // Índice 0, Inicio
-    ProfileOwnerScreen(),   // Índice 2
+    const MainOwnerScreen(),        // 0 Inicio
+    const NotificationsOwnerScreen(), // 1 Notificaciones
+    const ProfileOwnerScreen(),     // 2 Perfil
   ];
 
   @override
@@ -30,6 +30,10 @@ class _OwnerNavBarState extends State<OwnerNavBar> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Notificaciones',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

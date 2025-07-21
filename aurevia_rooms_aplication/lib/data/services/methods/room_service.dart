@@ -92,4 +92,16 @@ class RoomService {
     return [];
   }
 }
+static Future<List<Room>> getRoomsByStayIds({
+  required BuildContext context,
+  required List<int> stayIds,
+}) async {
+  try {
+    return await context.read<RoomRepository>().getRoomsByStayIds(stayIds);
+  } catch (e) {
+    debugPrint('❌ Error obteniendo rooms por stayIds: $e');
+    return [];
+  }
+}
+
 }

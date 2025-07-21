@@ -1,15 +1,31 @@
+import 'package:aureviarooms/data/models/booking_model.dart';
+import 'package:aureviarooms/data/models/promotion_model.dart';
+import 'package:aureviarooms/data/models/room_model.dart';
+import 'package:aureviarooms/data/models/stay_model.dart';
+import 'package:aureviarooms/data/models/room_rate_model.dart';
+import 'package:aureviarooms/data/services/methods/booking_service.dart';
+import 'package:aureviarooms/data/services/methods/promotion_service.dart';
+import 'package:aureviarooms/data/services/methods/room_rate_service.dart';
 import 'package:aureviarooms/data/services/methods/room_service.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:aureviarooms/data/models/stay_model.dart';
-import 'package:aureviarooms/data/models/room_model.dart';
-import 'package:aureviarooms/data/models/room_rate_model.dart';
-import 'package:aureviarooms/data/services/room_repository.dart';
-import 'package:aureviarooms/data/services/room_rate_repository.dart';
+
+// ANOTACIÓN: La clase auxiliar ahora también incluye las reservas del usuario.
+class StayDetailsData {
+  final List<Room> rooms;
+  final List<Promotion> promotions;
+  final List<Booking> userBookings;
+  StayDetailsData({required this.rooms, required this.promotions, required this.userBookings});
+}
+
+class DisplayRateInfo {
+  final RoomRate? standardRate;
+  final RoomRate? promotionalRate;
+  final Promotion? promotion;
+  DisplayRateInfo({this.standardRate, this.promotionalRate, this.promotion});
+}
 
 class StayDetailScreen extends StatefulWidget {
   final Stay stay;
-
   const StayDetailScreen({super.key, required this.stay});
 
   @override
@@ -17,161 +33,121 @@ class StayDetailScreen extends StatefulWidget {
 }
 
 class _StayDetailScreenState extends State<StayDetailScreen> {
-  late Future<List<Room>> _roomsFuture;
-  // Declarar las instancias de los repositorios como 'late'
-  late RoomRepository _roomRepository;
-  late RoomRateRepository _roomRateRepository;
-
+  late Future<StayDetailsData> _detailsFuture;
+  
   static const Color primaryBlue = Color(0xFF2A3A5B);
   static const Color accentGold = Color(0xFFD4AF37);
 
   @override
-  void initState() {
-    super.initState();
-    // En initState() no se debe acceder al context para Providers directamente
-    // Se inicializarán en didChangeDependencies()
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Aquí es seguro acceder a los Providers, ya que el context está completamente inicializado
-    // y los Providers están disponibles en el árbol de widgets.
-    _roomRepository = Provider.of<RoomRepository>(context, listen: false);
-    _roomRateRepository = Provider.of<RoomRateRepository>(context, listen: false);
-    
-    // Solo carga las habitaciones si stay.stayId no es nulo
-    if (widget.stay.stayId != null) {
-      _loadRooms(); 
-    } else {
-      // Manejar el caso donde stayId es nulo, quizás mostrar un error.
-      _roomsFuture = Future.error('El ID del alojamiento es nulo.');
-    }
+    _loadStayDetails();
   }
 
-  void _loadRooms() {
-    _roomsFuture = _roomRepository.getRoomsByStay(widget.stay.stayId!);
-    // No es necesario setState aquí, ya que el FutureBuilder en el build() se encargará de la actualización.
+  void _loadStayDetails() {
+    if (widget.stay.stayId == null) {
+      _detailsFuture = Future.error('El ID del alojamiento es nulo.');
+      return;
+    }
+    setState(() {
+      _detailsFuture = _fetchDetails();
+    });
+  }
+  
+  // ANOTACIÓN: Ahora cargamos habitaciones, promociones y las reservas del usuario en paralelo.
+  Future<StayDetailsData> _fetchDetails() async {
+    final stayId = widget.stay.stayId!;
+    final results = await Future.wait([
+      RoomService.getAvailableRoomsByStay(context: context, stayId: stayId),
+      PromotionService.getActivePromotionsByStay(context: context, stayId: stayId),
+      BookingService.getBookingsForCurrentUser(context: context), // <-- Se añade la llamada
+    ]);
+    return StayDetailsData(
+      rooms: results[0] as List<Room>,
+      promotions: results[1] as List<Promotion>,
+      userBookings: results[2] as List<Booking>, // <-- Se guardan las reservas
+    );
   }
 
-  // Ahora _getRoomDetails usa las instancias de los repositorios ya obtenidas en didChangeDependencies
-  Future<Map<String, dynamic>> _getRoomDetails(int roomId) async {
-    double? minPrice;
-    String? featuresText;
+  void _handleBookingRequest(BuildContext context, Room room, double price) async {
+    final checkInDate = DateTime.now();
+    final checkOutDate = DateTime.now().add(const Duration(days: 1));
 
-    try {
-      final List<RoomRate> rates = await _roomRateRepository.getActiveRatesByRoom(roomId);
-      if (rates.isNotEmpty) {
-        minPrice = rates.map((r) => r.price).reduce((a, b) => a < b ? a : b);
-      }
-    } catch (e) {
-      debugPrint('Error obteniendo tarifas para Room $roomId: $e');
+    final booking = await BookingService.createBooking(
+      context: context,
+      roomId: room.roomId!,
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      totalPrice: price,
+    );
+
+    if (booking != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Solicitud de reserva enviada!'), backgroundColor: Colors.green),
+      );
+      // ANOTACIÓN: Volvemos a cargar los datos para que el estado del botón se actualice inmediatamente.
+      _loadStayDetails(); 
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al enviar la solicitud.'), backgroundColor: Colors.red),
+      );
     }
-
-final Room? room = await RoomService.getRoomById(context: context, roomId: roomId);
-final features = room?.features;
-if (features != null && features.isNotEmpty) {
-  // Dentro de este bloque, Dart sabe que 'features' no es nulo y es seguro de usar.
-  featuresText = features.entries.map((entry) {
-    final key = entry.key;
-    final value = entry.value;
-    if (value is bool) return '${key.replaceFirst(key[0], key[0].toUpperCase())}: ${value ? 'Sí' : 'No'}';
-    return '${key.replaceFirst(key[0], key[0].toUpperCase())}: $value';
-  }).join(', ');
-}
-    return {
-      'minPrice': minPrice,
-      'featuresText': featuresText,
-    };
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.stay.name, style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: IconThemeData(color: primaryBlue),
-      ),
+      appBar: AppBar(title: Text(widget.stay.name)),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.stay.mainImageUrl != null && widget.stay.mainImageUrl!.isNotEmpty)
+            if (widget.stay.mainImageUrl != null)
               Image.network(
                 widget.stay.mainImageUrl!,
                 height: 250,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 250,
-                  color: Colors.grey[200],
-                  child: Icon(Icons.broken_image, size: 80, color: Colors.grey[600]),
-                ),
               ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.stay.name,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: primaryBlue,
-                    ),
-                  ),
+                  Text(widget.stay.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text(
-                    widget.stay.category,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: primaryBlue.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (widget.stay.description != null && widget.stay.description!.isNotEmpty)
-                    Text(
-                      widget.stay.description!,
-                      style: const TextStyle(fontSize: 16, color: Colors.black87),
-                    ),
+                  Text(widget.stay.description ?? 'Sin descripción.', style: const TextStyle(fontSize: 16, color: Colors.black54)),
                   const SizedBox(height: 24),
-                  Text(
-                    'Habitaciones disponibles',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: primaryBlue,
-                    ),
-                  ),
+                  Text('Habitaciones disponibles', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryBlue)),
                   const SizedBox(height: 16),
-                  FutureBuilder<List<Room>>(
-                    future: _roomsFuture,
+                  FutureBuilder<StayDetailsData>(
+                    future: _detailsFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
                       if (snapshot.hasError) {
-                        return Center(child: Text('Error cargando habitaciones: ${snapshot.error}'));
+                        return Center(child: Text('Error: ${snapshot.error}'));
                       }
-                      final rooms = snapshot.data ?? [];
-                      if (rooms.isEmpty) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20.0),
-                            child: Text('No hay habitaciones disponibles para este alojamiento.'),
-                          ),
-                        );
+                      if (!snapshot.hasData || snapshot.data!.rooms.isEmpty) {
+                        return const Center(child: Text('No hay habitaciones disponibles.'));
                       }
+                      
+                      final rooms = snapshot.data!.rooms;
+                      final promotions = snapshot.data!.promotions;
+                      final userBookings = snapshot.data!.userBookings;
+
                       return ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: rooms.length,
                         itemBuilder: (context, index) {
-                          final room = rooms[index];
-                          return _buildRoomCard(room);
+                          return _RoomCard(
+                            room: rooms[index],
+                            promotions: promotions,
+                            userBookings: userBookings, // <-- Pasamos las reservas del usuario
+                            onBook: (price) => _handleBookingRequest(context, rooms[index], price),
+                          );
                         },
                       );
                     },
@@ -184,114 +160,165 @@ if (features != null && features.isNotEmpty) {
       ),
     );
   }
+}
 
-  Widget _buildRoomCard(Room room) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _getRoomDetails(room.roomId!),
-      builder: (context, snapshot) {
-        double? price = snapshot.data?['minPrice'];
-        String? features = snapshot.data?['featuresText'];
+class _RoomCard extends StatelessWidget {
+  final Room room;
+  final List<Promotion> promotions;
+  final List<Booking> userBookings; // <-- Recibe las reservas
+  final Function(double price) onBook;
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Card(
-            margin: EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: LinearProgressIndicator(),
-            ),
-          );
-        }
+  const _RoomCard({
+    required this.room,
+    required this.promotions,
+    required this.userBookings,
+    required this.onBook,
+  });
 
-        if (snapshot.hasError) {
-          debugPrint('Error in FutureBuilder for room details: ${snapshot.error}');
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text('Error al cargar detalles de la habitación: ${snapshot.error}'),
-            ),
-          );
-        }
+  Future<DisplayRateInfo?> _getRateDetails(BuildContext context) async {
+    final allRates = await RoomRateService.getRatesByRoom(context: context, roomId: room.roomId!);
+    if (allRates.isEmpty) return null;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    room.roomImageUrl ?? 'https://via.placeholder.com/100?text=Room',
-                    height: 100,
-                    width: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 100,
-                      width: 100,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.broken_image, size: 40, color: Colors.grey[600]),
-                    ),
-                  ),
+    RoomRate? standardRate;
+    RoomRate? promotionalRate;
+
+    for (var rate in allRates) {
+      if (rate.promotionId == null) {
+        standardRate = rate;
+      } else {
+        promotionalRate = rate;
+      }
+    }
+
+    if (promotionalRate != null) {
+      Promotion? promotionDetails;
+      if (promotionalRate.promotionId != null) {
+        try {
+          promotionDetails = promotions.firstWhere((p) => p.promotionId == promotionalRate!.promotionId);
+        } catch (e) { /* Promoción no activa */ }
+      }
+      return DisplayRateInfo(
+        standardRate: standardRate, 
+        promotionalRate: promotionalRate,
+        promotion: promotionDetails,
+      );
+    } else if (standardRate != null) {
+      return DisplayRateInfo(standardRate: standardRate);
+    }
+
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isAvailable = room.availabilityStatus.toLowerCase() == 'available';
+    // ANOTACIÓN: Verificamos si ya existe una solicitud pendiente o confirmada para esta habitación.
+    final hasPendingBooking = userBookings.any((b) => b.roomId == room.roomId && (b.bookingStatus == 'pending' || b.bookingStatus == 'confirmed'));
+    
+    final Color statusColor = isAvailable ? Colors.green : Colors.red;
+    final String statusText = isAvailable ? 'Disponible' : 'No Disponible';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (room.roomImageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: Image.network(
+                  room.roomImageUrl!,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Habitación #${room.roomId}',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold, color: primaryBlue),
-                      ),
-                      const SizedBox(height: 8),
-                      if (features != null && features.isNotEmpty)
-                        Text(
-                          features,
-                          style: const TextStyle(fontSize: 14, color: Colors.grey),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        price != null ? '\$${price.toStringAsFixed(0)} /noche' : 'Precio no disponible',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold, color: accentGold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Estado: ${room.availabilityStatus}',
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: room.availabilityStatus == 'Available' ? Colors.green : Colors.red),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
+              ),
+            const SizedBox(height: 12),
+            Text(room.features?['description'] ?? 'Habitación Estándar', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'Estado: $statusText',
+              style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            FutureBuilder<DisplayRateInfo?>(
+              future: _getRateDetails(context),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const LinearProgressIndicator();
+                }
+                if (!snapshot.hasData || snapshot.data == null) {
+                  return const Text('Precio no disponible.');
+                }
+
+                final rateInfo = snapshot.data!;
+                final standardPrice = rateInfo.standardRate?.price;
+                final promotionalPrice = rateInfo.promotionalRate?.price;
+                final promotion = rateInfo.promotion;
+                final finalPrice = promotionalPrice ?? standardPrice ?? 0.0;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (promotion != null && promotionalPrice != null)
+                      Container(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: room.availabilityStatus == 'Available' ? () {
-                            debugPrint('Reservar Habitación ${room.roomId}');
-                          } : null,
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200)
+                        ),
+                        child: Text(
+                          '🎉 OFERTA: ${promotion.description}',
+                          style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (promotionalPrice != null && standardPrice != null)
+                              Text(
+                                '\$${standardPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            Text(
+                              '\$${finalPrice.toStringAsFixed(0)} /noche',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
+                            ),
+                          ],
+                        ),
+                        // ANOTACIÓN: El botón ahora comprueba si ya existe una reserva.
+                        ElevatedButton(
+                          onPressed: (finalPrice > 0 && isAvailable && !hasPendingBooking) ? () => onBook(finalPrice) : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: accentGold,
+                            backgroundColor: hasPendingBooking ? Colors.grey : Theme.of(context).primaryColor,
                             foregroundColor: Colors.white,
                           ),
-                          child: const Text('Reservar Ahora'),
+                          child: Text(hasPendingBooking ? 'Solicitud Enviada' : 'Solicitar Reserva'),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

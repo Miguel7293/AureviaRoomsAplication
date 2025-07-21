@@ -2,14 +2,11 @@
 
 import 'package:aureviarooms/presentation/screens/user/stay_detail_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';import 'package:provider/provider.dart';
 import '../../../data/models/stay_model.dart';
 import '../../../data/services/stay_repository.dart';
 import '../../../controller/map_controller.dart';
-import '../../../provider/connection_provider.dart';
-import '../../../data/services/local_storage_manager.dart';
-import '../../../data/services/map_service.dart';
 
 class MapUserScreen extends StatefulWidget {
   const MapUserScreen({super.key});
@@ -20,19 +17,38 @@ class MapUserScreen extends StatefulWidget {
 
 class _MapUserScreenState extends State<MapUserScreen> {
   late MapController _mapController;
-  bool _isLoading = true;
+  
+  bool _isLocationServiceEnabled = false;
+  bool _isCheckingLocation = true;
+  bool _isLoadingMap = true;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _checkLocationService();
+  }
+  
+  Future<void> _checkLocationService() async {
+    if (!mounted) return;
+    setState(() => _isCheckingLocation = true);
+
+    final isEnabled = await Geolocator.isLocationServiceEnabled();
+    
+    if (mounted) {
+      setState(() {
+        _isLocationServiceEnabled = isEnabled;
+        _isCheckingLocation = false;
+      });
+
+      if (isEnabled) {
+        _initializeMap();
+      }
+    }
+  }
+
+  void _initializeMap() {
     final stayRepository = Provider.of<StayRepository>(context, listen: false);
-
-    // ✅ Crear las dependencias necesarias
-    final connectionProvider = ConnectionProvider();
-    final localStorageManager = LocalStorageManager();
-
-    // ✅ Inicializar el controlador del mapa
     _mapController = MapController(
       stayRepo: stayRepository,
       updateUI: () { if (mounted) setState(() {}); },
@@ -40,16 +56,11 @@ class _MapUserScreenState extends State<MapUserScreen> {
       showMessage: _showSnackBar,
     );
 
-    _initializeMap();
-  }
-
-  Future<void> _initializeMap() async {
-    try {
-      await _mapController.initialize();
-    } catch (e) {
+    _mapController.initialize().catchError((e) {
       if (mounted) _errorMessage = e.toString();
-    }
-    if (mounted) setState(() => _isLoading = false);
+    }).whenComplete(() {
+      if (mounted) setState(() => _isLoadingMap = false);
+    });
   }
 
   void _showStayDetails(Stay stay) {
@@ -78,15 +89,16 @@ class _MapUserScreenState extends State<MapUserScreen> {
 
   void _showSnackBar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
   @override
   void dispose() {
-    _mapController.dispose();
+    // Solo intenta llamar a dispose si el controlador fue inicializado
+    if (this.mounted && _isLocationServiceEnabled) { 
+      _mapController.dispose();
+    }
     super.dispose();
   }
 
@@ -94,23 +106,73 @@ class _MapUserScreenState extends State<MapUserScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Mapa de Alojamientos')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text('Error al cargar el mapa: $_errorMessage', textAlign: TextAlign.center),
-                  ),
-                )
-              : GoogleMap(
-                  initialCameraPosition: _mapController.initialCameraPosition,
-                  markers: _mapController.markers,
-                  polylines: _mapController.polylines,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  onMapCreated: _mapController.onMapCreated,
-                ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isCheckingLocation) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (!_isLocationServiceEnabled) {
+      return _buildEnableLocationUI();
+    }
+
+    if (_isLoadingMap) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Error al cargar el mapa: $_errorMessage', textAlign: TextAlign.center),
+        ),
+      );
+    }
+
+    return GoogleMap(
+      initialCameraPosition: _mapController.initialCameraPosition,
+      markers: _mapController.markers,
+      polylines: _mapController.polylines,
+      myLocationEnabled: true,
+      myLocationButtonEnabled: true,
+      onMapCreated: _mapController.onMapCreated,
+    );
+  }
+
+  Widget _buildEnableLocationUI() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_off, size: 60, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'Ubicación Desactivada',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Para usar el mapa, por favor activa el servicio de ubicación de tu dispositivo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                await Geolocator.openLocationSettings();
+                // Al regresar, volvemos a verificar el estado del servicio
+                _checkLocationService();
+              },
+              child: const Text('Activar Ubicación'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
