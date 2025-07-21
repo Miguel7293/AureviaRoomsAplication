@@ -91,4 +91,16 @@ class BookingService {
       return [];
     }
   }
+
+  static Future<List<Booking>> getPendingBookingsForCurrentUser({required BuildContext context}) async {
+  final userId = context.read<AuthProvider>().userId;
+  if (userId == null) return [];
+  try {
+    return await context.read<BookingRepository>().getPendingBookingsByUser(userId);
+  } catch (e) {
+    debugPrint('❌ Error obteniendo reservas pendientes del usuario: $e');
+    return [];
+  }
+}
+
 }

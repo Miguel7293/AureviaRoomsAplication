@@ -40,6 +40,35 @@ class BookingRepository {
     return updatedBooking;
   }
 
+  Future<List<Booking>> getPendingBookingsByUser(String userId) async {
+  final cached = await _getBookingsFromCache();
+
+  if (!await _connectionProvider.isConnected) {
+    return cached.values
+        .where((b) => b.userId == userId && b.bookingStatus == 'pending')
+        .toList();
+  }
+
+  try {
+    final response = await _retryOptions.retry(() =>
+        _client.from('bookings')
+            .select()
+            .eq('user_id', userId)
+            .eq('booking_status', 'pending')
+    );
+
+    final bookings = (response as List).map((json) => Booking.fromJson(json)).toList();
+    await _addOrUpdateCache(bookings);
+    return bookings;
+  } catch (e) {
+    debugPrint('❌ Error obteniendo reservas pendientes, usando caché: $e');
+    return cached.values
+        .where((b) => b.userId == userId && b.bookingStatus == 'pending')
+        .toList();
+  }
+}
+
+
   // --- MÉTODO AÑADIDO QUE FALTABA ---
   Future<void> deleteBooking(int bookingId) async {
     await _guardConnection();
@@ -114,4 +143,6 @@ class BookingRepository {
     cachedMap.remove(bookingId);
     await _addOrUpdateCache(cachedMap.values.toList());
   }
+
+  
 }
