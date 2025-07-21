@@ -2,7 +2,6 @@ import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/models/hotel.dart';
-import 'package:aureviarooms/data/services/hotel_service.dart';
 import 'package:aureviarooms/provider/auth_provider.dart';
 import 'package:aureviarooms/data/models/user_model.dart';
 import 'package:aureviarooms/presentation/screens/user/edit_profile_screen.dart';
@@ -16,7 +15,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final HotelService _hotelService = HotelService();
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Pasa los colores del tema a los widgets hijos
             _buildProfileHeader(currentUser, primaryColor),
             const SizedBox(height: 16),
-            _buildFavoritesSection(context, primaryColor),
             const SizedBox(height: 24),
             // Pasa el themeProvider a la sección para que el Switch lo use
             _buildProfileSection(context, authProvider, themeProvider, primaryColor, accentColor),
@@ -159,56 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildFavoritesSection(BuildContext context, Color primaryColor) {
-    return FutureBuilder<List<Hotel>>(
-      future: _hotelService.getFeaturedHotels(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
 
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: Text('Error al cargar favoritos: ${snapshot.error}')),
-          );
-        }
-
-        final hotels = snapshot.data ?? [];
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hoteles Favoritos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor, // Usa el color primario del tema
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 220,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: hotels.length,
-                  itemBuilder: (context, index) {
-                    return _buildHotelCard(hotels[index]);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   // Ahora acepta themeProvider, primaryColor y accentColor
   Widget _buildProfileSection(BuildContext context, AuthProvider authProvider, ThemeProvider themeProvider, Color primaryColor, Color accentColor) {

@@ -175,15 +175,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onPressed: _isLoading ? null : _saveChanges,
                 style: ElevatedButton.styleFrom(
                   // Usa los colores definidos en el tema para ElevatedButtonTheme
-                  backgroundColor: Theme.of(context).elevatedButtonTheme.style?.backgroundColor?.resolve({MaterialState.pressed}),
-                  foregroundColor: Theme.of(context).elevatedButtonTheme.style?.foregroundColor?.resolve({MaterialState.pressed}),
+                  backgroundColor: Theme.of(context).elevatedButtonTheme.style?.backgroundColor?.resolve({WidgetState.pressed}),
+                  foregroundColor: Theme.of(context).elevatedButtonTheme.style?.foregroundColor?.resolve({WidgetState.pressed}),
                   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _isLoading
-                    ? CircularProgressIndicator(color: Theme.of(context).elevatedButtonTheme.style?.foregroundColor?.resolve({MaterialState.pressed}))
+                    ? CircularProgressIndicator(color: Theme.of(context).elevatedButtonTheme.style?.foregroundColor?.resolve({WidgetState.pressed}))
                     : const Text('Guardar Cambios', style: TextStyle(fontSize: 16)),
               ),
             ],

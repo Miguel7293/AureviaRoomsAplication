@@ -9,11 +9,14 @@ import '../../../../provider/auth_provider.dart';
 
 
 class StayService {
+
   static Future<Stay?> createStay({
     required BuildContext context,
     required String name,
     required String category,
     String? description,
+    String? mainImageUrl,
+    Map<String, dynamic>? location, 
   }) async {
     final ownerId = context.read<AuthProvider>().userId;
     if (ownerId == null) {
@@ -26,8 +29,10 @@ class StayService {
       name: name,
       category: category,
       description: description,
-      status: 'draft', // Los alojamientos se crean como borrador por defecto
+      status: 'draft',
       ownerId: ownerId,
+      mainImageUrl: mainImageUrl,
+      location: location, // <-- ANOTACIÓN: Pasa la ubicación al modelo
       createdAt: DateTime.now(),
     );
 

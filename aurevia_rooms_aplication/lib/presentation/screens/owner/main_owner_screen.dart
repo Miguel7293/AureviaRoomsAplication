@@ -89,8 +89,8 @@ class _MainOwnerScreenState extends State<MainOwnerScreen> {
           }
         },
         backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.add),
         tooltip: 'Añadir Alojamiento',
+        child: const Icon(Icons.add),
       ),
     );
   }

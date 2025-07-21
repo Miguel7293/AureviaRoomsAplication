@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -26,22 +25,18 @@ class AuthProvider with ChangeNotifier {
     _initializeAuth();
   }
 
+  // Getters
   bool get isAuthenticated => _isAuthenticated;
   String? get userId => _userId;
   User? get currentUser => _currentUser;
   UserModel? get appUser => _appUser;
-  String? get userType => _appUser?.userType;
   bool get isInitializingAuth => _isInitializingAuth;
 
-  Future<void> setUser(UserModel updatedUser) async {
-    try {
-      await _userModelRepository.updateUser(updatedUser);
-      _appUser = updatedUser;
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error updating user: $e');
-      throw e;
+  String? get userType {
+    if (_isAuthenticated && _appUser == null) {
+      return 'needs_selection'; 
     }
+    return _appUser?.userType;
   }
 
   void updateConnection(ConnectionProvider newConnection) {
@@ -49,39 +44,46 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> _initializeAuth() async {
-    _isInitializingAuth = true;
-    notifyListeners();
-
-    _authSubscription = _client.auth.onAuthStateChange.listen((data) async {
-      final oldUserId = _userId;
-      _currentUser = data.session?.user;
-      _userId = _currentUser?.id;
-      _isAuthenticated = _currentUser != null;
-
-      if (_isAuthenticated) {
-        if (_userId != oldUserId || _appUser == null) {
-          await _loadAppUser();
-        }
-      } else {
-        _appUser = null;
-      }
-
-      if (_isInitializingAuth) {
-        _isInitializingAuth = false;
-      }
-      notifyListeners();
+    // El listener ahora es más simple, solo delega al método centralizado.
+    _authSubscription = _client.auth.onAuthStateChange.listen((data) {
+      _updateSessionAndProfile(data.session);
     });
 
-    if (_client.auth.currentUser != null) {
-      _currentUser = _client.auth.currentUser;
-      _userId = _currentUser?.id;
-      _isAuthenticated = true;
-      if (_userId != null) {
-        await _loadAppUser();
-      }
-    } else {
-      _isInitializingAuth = false;
+    // Comprobación inicial al arrancar la app.
+    await _updateSessionAndProfile(_client.auth.currentSession, isInitializing: true);
+  }
+
+  // ANOTACIÓN: Este nuevo método centraliza la lógica de actualización.
+  Future<void> _updateSessionAndProfile(Session? session, {bool isInitializing = false}) async {
+    if (isInitializing) {
+      _isInitializingAuth = true;
       notifyListeners();
+    }
+    
+    _currentUser = session?.user;
+    _userId = _currentUser?.id;
+    _isAuthenticated = _currentUser != null;
+
+    if (_isAuthenticated) {
+      await _loadAppUser();
+    } else {
+      _appUser = null;
+    }
+
+    if (isInitializing) {
+      _isInitializingAuth = false;
+    }
+    // Solo notifica al final para evitar reconstrucciones innecesarias.
+    notifyListeners();
+  }
+
+  Future<void> setUser(UserModel updatedUser) async {
+    try {
+      _appUser = await _userModelRepository.updateUser(updatedUser);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error actualizando el perfil de usuario: $e');
+      rethrow;
     }
   }
 
@@ -92,33 +94,36 @@ class AuthProvider with ChangeNotifier {
     }
     try {
       _appUser = await _userModelRepository.getUserById(_userId!);
-      debugPrint('AuthProvider: App User loaded: ${_appUser?.username}, Type: ${_appUser?.userType}');
+      debugPrint('AuthProvider: Perfil de usuario cargado.');
     } catch (e) {
-      debugPrint('AuthProvider: Error getting App User by ID: $e');
-      if (e.toString().contains('Usuario no encontrado en caché') || e.toString().contains('PostgrestException')) {
-        debugPrint('UserModel not found, attempting to create new record...');
-        try {
-          _appUser = UserModel(
-            authUserId: _currentUser!.id,
-            username: _currentUser!.userMetadata?['full_name'] as String? ?? _currentUser!.email?.split('@').first ?? 'Usuario',
-            email: _currentUser!.email!,
-            userType: 'guest',
-            createdAt: DateTime.now(),
-            profileImageUrl: _currentUser!.userMetadata?['avatar_url'] as String?,
-            phoneNumber: _currentUser!.phone,
-          );
-          await _userModelRepository.createUser(_appUser!);
-          debugPrint('UserModel created successfully.');
-        } catch (createError) {
-          debugPrint('Error creating UserModel: $createError');
-          _appUser = null;
-        }
-      } else {
-        _appUser = null;
-      }
+      debugPrint('AuthProvider: Perfil de usuario no encontrado. Esperando selección de rol.');
+      _appUser = null;
     }
   }
 
+  Future<bool> createUserProfile(String role) async {
+    final authUser = _client.auth.currentUser;
+    if (authUser == null) return false;
+    try {
+      final newUser = UserModel(
+        authUserId: authUser.id,
+        username: authUser.userMetadata?['full_name'] as String? ?? authUser.email!.split('@').first,
+        email: authUser.email!,
+        userType: role,
+        createdAt: DateTime.now(),
+        profileImageUrl: authUser.userMetadata?['avatar_url'] as String?,
+        phoneNumber: authUser.phone,
+      );
+      _appUser = await _userModelRepository.createUser(newUser);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error creando el perfil de usuario: $e');
+      return false;
+    }
+  }
+
+  // ANOTACIÓN: Este es el método corregido que soluciona el problema.
   Future<void> loginWithGoogle() async {
     try {
       if (!_connectionProvider.isConnected) {
@@ -126,60 +131,41 @@ class AuthProvider with ChangeNotifier {
       }
 
       const webClientId = '546959425861-4dkijnept6pgua31kpqtch2kiva3jgo5.apps.googleusercontent.com';
-
-      final googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-        scopes: ['email', 'profile'],
-      );
-
+      final googleSignIn = GoogleSignIn(serverClientId: webClientId);
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) return;
 
       final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final idToken = googleAuth.idToken;
+      if (accessToken == null || idToken == null) throw 'No se encontró el token de Google';
 
-      await _client.auth.signInWithIdToken(
+      final authResponse = await _client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: googleAuth.idToken!,
-        accessToken: googleAuth.accessToken!,
+        idToken: idToken,
+        accessToken: accessToken,
       );
+
+      // Este es el paso clave: después de autenticar, llamamos a nuestro método
+      // centralizado que actualiza el perfil y notifica a la UI. El método
+      // no termina hasta que este paso se completa.
+      if (authResponse.session != null) {
+        await _updateSessionAndProfile(authResponse.session);
+      }
     } catch (e) {
       debugPrint('Error Google SignIn: $e');
-      if (e is PlatformException && e.code == 'channel-error') {
-        throw Exception('Error al conectar con Google. Por favor, inténtalo de nuevo.');
-      }
       rethrow;
     }
   }
 
   Future<void> logout() async {
-    debugPrint('Starting logout process...');
     try {
       if (await _googleSignIn.isSignedIn()) {
-        await _googleSignIn.disconnect();
-        debugPrint('Google Sign In disconnected.');
-      } else {
-        debugPrint('Google Sign In was not signed in.');
+        await _googleSignIn.signOut();
       }
-
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (_connectionProvider.isConnected) {
-        await _client.auth.signOut();
-        debugPrint('Supabase session signed out.');
-      } else {
-        debugPrint('Logout offline. Supabase sync pending.');
-      }
-
-      _isAuthenticated = false;
-      _userId = null;
-      _currentUser = null;
-      _appUser = null;
-      debugPrint('AuthProvider state cleared.');
+      await _client.auth.signOut();
     } catch (e) {
       debugPrint('Error during logout: $e');
-    } finally {
-      notifyListeners();
-      debugPrint('Logout process finished.');
     }
   }
 
@@ -189,4 +175,3 @@ class AuthProvider with ChangeNotifier {
     super.dispose();
   }
 }
-

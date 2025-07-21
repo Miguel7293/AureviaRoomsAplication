@@ -96,7 +96,7 @@ class _MapUserScreenState extends State<MapUserScreen> {
   @override
   void dispose() {
     // Solo intenta llamar a dispose si el controlador fue inicializado
-    if (this.mounted && _isLocationServiceEnabled) { 
+    if (mounted && _isLocationServiceEnabled) { 
       _mapController.dispose();
     }
     super.dispose();

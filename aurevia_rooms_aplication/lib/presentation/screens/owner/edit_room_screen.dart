@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:aureviarooms/data/models/room_model.dart';
 import 'package:aureviarooms/data/services/methods/room_service.dart';
+import 'package:flutter/material.dart';
 
 class EditRoomScreen extends StatefulWidget {
   final Room room;
@@ -14,28 +14,30 @@ class EditRoomScreen extends StatefulWidget {
 class _EditRoomScreenState extends State<EditRoomScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _nameController;
   late TextEditingController _descController;
   late TextEditingController _capacityController;
   late TextEditingController _imageUrlController;
 
+  bool _hasWifi = false;
+  bool _hasTV = false;
+  bool _hasPrivateBathroom = false;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
     final f = widget.room.features ?? {};
-    _nameController = TextEditingController(text: f['name'] ?? '');
     _descController = TextEditingController(text: f['description'] ?? '');
-    _capacityController =
-        TextEditingController(text: f['capacity']?.toString() ?? '1');
-    _imageUrlController =
-        TextEditingController(text: widget.room.roomImageUrl ?? '');
+    _capacityController = TextEditingController(text: f['capacity']?.toString() ?? '1');
+    _imageUrlController = TextEditingController(text: widget.room.roomImageUrl ?? '');
+
+    _hasWifi = (f['wifi'] as bool?) ?? false;
+    _hasTV = (f['tv'] as bool?) ?? false;
+    _hasPrivateBathroom = (f['private_bathroom'] as bool?) ?? false;
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
     _descController.dispose();
     _capacityController.dispose();
     _imageUrlController.dispose();
@@ -48,9 +50,11 @@ class _EditRoomScreenState extends State<EditRoomScreen> {
     setState(() => _loading = true);
 
     final updatedFeatures = {
-      'name': _nameController.text.trim(),
       'description': _descController.text.trim(),
       'capacity': int.tryParse(_capacityController.text.trim()) ?? 1,
+      'wifi': _hasWifi,
+      'tv': _hasTV,
+      'private_bathroom': _hasPrivateBathroom,
     };
 
     final updatedRoom = widget.room.copyWith(
@@ -65,171 +69,110 @@ class _EditRoomScreenState extends State<EditRoomScreen> {
       roomToUpdate: updatedRoom,
     );
 
-    setState(() => _loading = false);
-
-    if (result != null) {
-      if (!mounted) return;
-      Navigator.pop(context, true);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Error al actualizar habitación')),
-      );
+    if (mounted) {
+      setState(() => _loading = false);
+      if (result != null) {
+        Navigator.pop(context, true); // Devuelve true para recargar la lista anterior
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Error al actualizar habitación')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final Color primaryColor = theme.primaryColor;
-    final Color textColor = theme.textTheme.bodyLarge!.color!;
-    final Color dividerColor = theme.dividerColor;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Editar Habitación"),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: primaryColor),
-      ),
+      appBar: AppBar(title: const Text("Editar Habitación")),
       body: Form(
         key: _formKey,
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              /// ✅ NOMBRE BLOQUEADO
-              _buildStyledTextField(
-                icon: Icons.bed_outlined,
-                label: "Nombre de la Habitación",
-                controller: _nameController,
-                textColor: textColor,
-                dividerColor: dividerColor,
-                primaryColor: primaryColor,
-                readOnly: true,
-              ),
-              const SizedBox(height: 12),
+          children: [
+            Text('Habitación #${widget.room.roomId}', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 20),
+            
+            TextFormField(
+              controller: _descController,
+              decoration: _buildInputDecoration(label: "Descripción", icon: Icons.description_outlined),
+              maxLines: 2,
+              validator: (val) => (val == null || val.trim().isEmpty) ? 'La descripción no puede estar vacía' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _capacityController,
+              decoration: _buildInputDecoration(label: "Capacidad (personas)", icon: Icons.people_outline),
+              keyboardType: TextInputType.number,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Ingrese la capacidad';
+                final num? cap = int.tryParse(val);
+                if (cap == null || cap < 1) return 'Capacidad inválida';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _imageUrlController,
+              decoration: _buildInputDecoration(label: "URL de Imagen", icon: Icons.image_outlined),
+            ),
+            const Divider(height: 40),
 
-              /// ✅ DESCRIPCIÓN
-              _buildStyledTextField(
-                icon: Icons.description_outlined,
-                label: "Descripción",
-                controller: _descController,
-                textColor: textColor,
-                dividerColor: dividerColor,
-                primaryColor: primaryColor,
-                maxLines: 2,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'La descripción no puede estar vacía';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
+            Text('Características Adicionales', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
 
-              /// ✅ CAPACIDAD
-              _buildStyledTextField(
-                icon: Icons.people_outline,
-                label: "Capacidad",
-                controller: _capacityController,
-                textColor: textColor,
-                dividerColor: dividerColor,
-                primaryColor: primaryColor,
-                keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.isEmpty) {
-                    return 'Ingrese la capacidad';
-                  }
-                  final num? cap = int.tryParse(val);
-                  if (cap == null || cap < 1) {
-                    return 'Capacidad inválida';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              /// ✅ IMAGEN
-              _buildStyledTextField(
-                icon: Icons.image_outlined,
-                label: "URL de Imagen",
-                controller: _imageUrlController,
-                textColor: textColor,
-                dividerColor: dividerColor,
-                primaryColor: primaryColor,
-              ),
-
-              const Spacer(),
-
-              /// ✅ BOTÓN GUARDAR
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: _loading ? null : _updateRoom,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text("Guardar Cambios"),
+            SwitchListTile(
+              title: const Text('WiFi'),
+              value: _hasWifi,
+              onChanged: (value) => setState(() => _hasWifi = value),
+              secondary: const Icon(Icons.wifi),
+            ),
+            SwitchListTile(
+              title: const Text('Televisión'),
+              value: _hasTV,
+              onChanged: (value) => setState(() => _hasTV = value),
+              secondary: const Icon(Icons.tv),
+            ),
+            SwitchListTile(
+              title: const Text('Baño Privado'),
+              value: _hasPrivateBathroom,
+              onChanged: (value) => setState(() => _hasPrivateBathroom = value),
+              secondary: const Icon(Icons.bathtub_outlined),
+            ),
+            
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                onPressed: _loading ? null : _updateRoom,
+                child: _loading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text("Guardar Cambios"),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// ✅ MISMO ESTILO QUE EN PROFILEOWNER
-  Widget _buildStyledTextField({
-    required IconData icon,
-    required String label,
-    required TextEditingController controller,
-    required Color textColor,
-    required Color dividerColor,
-    required Color primaryColor,
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-    bool readOnly = false,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: readOnly,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      validator: validator,
-      style: TextStyle(color: textColor),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: dividerColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: primaryColor, width: 2),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: dividerColor),
-        ),
-        filled: readOnly,
-        fillColor: readOnly ? Colors.grey.withOpacity(0.1) : null,
+  InputDecoration _buildInputDecoration({required String label, required IconData icon}) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
       ),
     );
   }

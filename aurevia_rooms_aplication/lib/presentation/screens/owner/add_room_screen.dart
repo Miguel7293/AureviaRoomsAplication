@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+// lib/presentation/screens/owner/add_room_screen.dart
+
+import 'package:aureviarooms/data/services/methods/room_rate_service.dart';
 import 'package:aureviarooms/data/services/methods/room_service.dart';
+import 'package:flutter/material.dart';
 
 class AddRoomScreen extends StatefulWidget {
   final int stayId;
-
   const AddRoomScreen({super.key, required this.stayId});
 
   @override
@@ -11,117 +13,110 @@ class AddRoomScreen extends StatefulWidget {
 }
 
 class _AddRoomScreenState extends State<AddRoomScreen> {
-  static const Color primaryBlue = Color(0xFF2A3A5B);
-  static const Color accentGold = Color(0xFFD4AF37);
-
   final _formKey = GlobalKey<FormState>();
-
-  final _nameController = TextEditingController();
   final _descController = TextEditingController();
-  final _capacityController = TextEditingController();
+  final _priceController = TextEditingController(); // <-- ANOTACIÓN: Añadido para el precio
   final _imageUrlController = TextEditingController();
-
-  bool _loading = false;
-
-  Future<void> _saveRoom() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _loading = true);
-
-    final features = {
-      'name': _nameController.text.trim(),
-      'description': _descController.text.trim(),
-      'capacity': int.tryParse(_capacityController.text.trim()) ?? 1,
-    };
-
-    final success = await RoomService.createRoom(
-      context: context,
-      stayId: widget.stayId,
-      features: features,
-      imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
-    );
-
-    setState(() => _loading = false);
-
-    if (success != null) {
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Error al crear habitación')),
-      );
-    }
-  }
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _descController.dispose();
-    _capacityController.dispose();
+    _priceController.dispose();
     _imageUrlController.dispose();
     super.dispose();
+  }
+
+  // ANOTACIÓN: La lógica de guardado ahora crea la habitación Y su tarifa
+  Future<void> _saveRoom() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    // 1. Crear la habitación
+    final newRoom = await RoomService.createRoom(
+      context: context,
+      stayId: widget.stayId,
+      features: {'description': _descController.text.trim()},
+      imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
+    );
+
+    // 2. Si la habitación se crea con éxito, crear su tarifa estándar
+    if (newRoom != null && newRoom.roomId != null && mounted) {
+      final price = double.tryParse(_priceController.text);
+      if (price == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Precio inválido.'), backgroundColor: Colors.red),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      await RoomRateService.createRate(
+        context: context,
+        roomId: newRoom.roomId!,
+        rateType: 'Estándar', // Se crea una tarifa estándar por defecto
+        price: price,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Habitación añadida con éxito'), backgroundColor: Colors.green),
+      );
+      Navigator.pop(context, true); // Devuelve 'true' para indicar que se debe recargar
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al crear la habitación'), backgroundColor: Colors.red),
+      );
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: primaryBlue,
-        title: const Text('Agregar Habitación', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      appBar: AppBar(title: const Text('Añadir Nueva Habitación')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildTextField(
-                controller: _nameController,
-                label: 'Nombre de la habitación',
-                validator: (v) => v!.isEmpty ? 'Ingrese un nombre' : null,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
+              TextFormField(
                 controller: _descController,
-                label: 'Descripción',
+                decoration: _buildInputDecoration(label: 'Descripción de la habitación', hint: 'Ej: Habitación Doble con vista al lago'),
+                validator: (value) => value!.isEmpty ? 'Este campo es requerido' : null,
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              _buildTextField(
-                controller: _capacityController,
-                label: 'Capacidad (número de personas)',
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v!.isEmpty) return 'Ingrese capacidad';
-                  final cap = int.tryParse(v);
-                  if (cap == null || cap <= 0) return 'Capacidad inválida';
+              // ANOTACIÓN: Campo añadido para el precio, que es esencial
+              TextFormField(
+                controller: _priceController,
+                decoration: _buildInputDecoration(label: 'Precio por Noche', hint: 'Ej: 50.00'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'El precio es requerido';
+                  if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                    return 'Ingrese un precio válido';
+                  }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-              _buildTextField(
+              TextFormField(
                 controller: _imageUrlController,
-                label: 'URL de imagen (opcional)',
+                decoration: _buildInputDecoration(label: 'URL de la Imagen (Opcional)'),
+                keyboardType: TextInputType.url,
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.save),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryBlue,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: _loading ? null : _saveRoom,
-                  label: const Text('Guardar habitación', style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _saveRoom,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                child: _isLoading 
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)) 
+                    : const Text('Guardar Habitación'),
               ),
             ],
           ),
@@ -130,35 +125,19 @@ class _AddRoomScreenState extends State<AddRoomScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? Function(String?)? validator,
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryBlue.withOpacity(0.7)),
-        filled: true,
-        fillColor: Colors.grey[100],
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryBlue.withOpacity(0.3)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryBlue.withOpacity(0.3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryBlue, width: 2),
-        ),
+  InputDecoration _buildInputDecoration({required String label, String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
       ),
     );
   }

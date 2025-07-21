@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aureviarooms/data/models/stay_model.dart';
-import 'package:aureviarooms/data/models/room_model.dart';
-import 'package:aureviarooms/data/models/room_rate_model.dart';
 import 'package:aureviarooms/data/services/stay_repository.dart';
 import 'package:aureviarooms/data/services/room_repository.dart';
 import 'package:aureviarooms/data/services/room_rate_repository.dart';
@@ -233,8 +231,8 @@ class _MainUserScreenState extends State<MainUserScreen> {
           spacing: 8,
           children: [
             _buildFilterChip('Todo', primaryColor, textColor), // Pasa los colores
-            _buildFilterChip('Hotel', primaryColor, textColor), // Pasa los colores
-            _buildFilterChip('Apartamento', primaryColor, textColor), // Pasa los colores
+            _buildFilterChip('hotel', primaryColor, textColor), // Pasa los colores
+            _buildFilterChip('apartment', primaryColor, textColor), // Pasa los colores
           ],
         ),
       ],

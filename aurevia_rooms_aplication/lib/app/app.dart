@@ -37,6 +37,8 @@ class UserTypeGate extends StatelessWidget {
           return const ChoosingRoleScreen(); // Para elegir rol
         case 'isWaiting':
           return const WaitingApprovalScreen(); // Para usuarios en espera
+        case 'needs_selection':
+          return const ChoosingRoleScreen(); 
         default:
           // Si el tipo es nulo o desconocido, podría ser un error.
           // Enviar al login es una opción segura.
