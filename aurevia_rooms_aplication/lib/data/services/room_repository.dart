@@ -96,6 +96,33 @@ class RoomRepository {
     }
   }
 
+  Future<List<Room>> getAvailableRoomsByStay(int stayId) async {
+  // Define el filtro para la lógica offline
+  bool isRoomAvailable(Room r) => r.stayId == stayId && r.availabilityStatus == 'available';
+
+  final cachedRooms = await _getRoomsFromCache();
+  if (!await _connectionProvider.isConnected) {
+    return cachedRooms.values.where(isRoomAvailable).toList();
+  }
+
+  try {
+    // Consulta a Supabase con doble filtro
+    final response = await _retryOptions.retry(
+      () => _client
+          .from('rooms')
+          .select()
+          .eq('stay_id', stayId)
+          .eq('availability_status', 'available'),
+    );
+    final rooms = (response as List).map((json) => Room.fromJson(json)).toList();
+    await _addOrUpdateCache(rooms); // Actualiza el caché con los datos frescos
+    return rooms;
+  } catch (e) {
+    debugPrint('❌ Error obteniendo habitaciones disponibles, filtrando desde caché: $e');
+    return cachedRooms.values.where(isRoomAvailable).toList();
+  }
+}
+
   // --- MÉTODOS PRIVADOS ---
 
   Future<void> _guardConnection() async {
