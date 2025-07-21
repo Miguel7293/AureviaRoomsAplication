@@ -16,8 +16,9 @@ class MainUserScreen extends StatefulWidget {
 }
 
 class _MainUserScreenState extends State<MainUserScreen> {
-  static const Color primaryBlue = Color(0xFF2A3A5B);
-  static const Color accentGold = Color(0xFFD4AF37);
+  // Elimina las definiciones de colores estáticos aquí, ahora vienen del tema
+  // static const Color primaryBlue = Color(0xFF2A3A5B);
+  // static const Color accentGold = Color(0xFFD4AF37);
 
   late Future<List<Stay>> _staysFuture;
   final TextEditingController _searchController = TextEditingController();
@@ -96,10 +97,20 @@ class _MainUserScreenState extends State<MainUserScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Accede a los colores del tema
+    final Color primaryColor = Theme.of(context).primaryColor;
+    final Color accentColor = Theme.of(context).hintColor;
+    final Color textColor = Theme.of(context).textTheme.bodyLarge!.color!; // Color de texto principal
+    final Color secondaryTextColor = Theme.of(context).textTheme.bodyMedium!.color!; // Color de texto secundario
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
+    final Color dividerColor = Theme.of(context).dividerColor;
+
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: scaffoldBackgroundColor, // Usa el color de fondo del Scaffold o el de la AppBar del tema
         automaticallyImplyLeading: false,
         title: Align(
           alignment: Alignment.centerLeft,
@@ -107,7 +118,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: primaryBlue),
+            icon: Icon(Icons.refresh, color: primaryColor), // Usa primaryColor
             onPressed: _fetchStays,
           ),
         ],
@@ -118,13 +129,26 @@ class _MainUserScreenState extends State<MainUserScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Encuentra tu estancia perfecta', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primaryBlue)),
+              Text(
+                'Encuentra tu estancia perfecta',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor, // Usa primaryColor
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Busca ofertas en hoteles, casas y mucho más...', style: TextStyle(fontSize: 16, color: primaryBlue.withOpacity(0.7))),
+              Text(
+                'Busca ofertas en hoteles, casas y mucho más...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: textColor.withOpacity(0.7), // Usa el color de texto y ajusta opacidad
+                ),
+              ),
               const SizedBox(height: 24),
-              _buildSearchAndFilters(),
+              _buildSearchAndFilters(primaryColor, textColor, accentColor), // Pasa los colores
               const SizedBox(height: 24),
-              _buildFeaturedPlaces(),
+              _buildFeaturedPlaces(primaryColor, accentColor), // Pasa los colores
             ],
           ),
         ),
@@ -132,7 +156,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
     );
   }
 
-  Widget _buildSearchAndFilters() {
+  Widget _buildSearchAndFilters(Color primaryColor, Color textColor, Color accentColor) {
     final stayRepository = Provider.of<StayRepository>(context, listen: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,6 +171,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
               alignment: Alignment.topLeft,
               child: Material(
                 elevation: 4.0,
+                color: Theme.of(context).cardColor, // Usa el color de la tarjeta del tema
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 200),
                   child: ListView.builder(
@@ -156,7 +181,9 @@ class _MainUserScreenState extends State<MainUserScreen> {
                       final option = options.elementAt(index);
                       return InkWell(
                         onTap: () => onSelected(option),
-                        child: ListTile(title: Text(option.name)),
+                        child: ListTile(
+                          title: Text(option.name, style: TextStyle(color: textColor)), // Usa textColor
+                        ),
                       );
                     },
                   ),
@@ -169,9 +196,9 @@ class _MainUserScreenState extends State<MainUserScreen> {
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
             return Container(
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Theme.of(context).inputDecorationTheme.fillColor ?? Colors.grey[100], // Usa color de relleno del input
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryBlue.withOpacity(0.3)),
+                border: Border.all(color: primaryColor.withOpacity(0.3)), // Usa primaryColor
               ),
               child: TextField(
                 controller: controller,
@@ -182,12 +209,12 @@ class _MainUserScreenState extends State<MainUserScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: '¿A dónde quieres ir?',
-                  hintStyle: TextStyle(color: primaryBlue.withOpacity(0.6)),
+                  hintStyle: TextStyle(color: textColor.withOpacity(0.6)), // Usa textColor
                   border: InputBorder.none,
-                  prefixIcon: Icon(Icons.search, color: primaryBlue),
+                  prefixIcon: Icon(Icons.search, color: primaryColor), // Usa primaryColor
                   suffixIcon: controller.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          icon: Icon(Icons.clear, color: Theme.of(context).iconTheme.color), // Usa iconTheme color
                           onPressed: () {
                             controller.clear();
                             _clearSearch();
@@ -196,7 +223,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
                       : null,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                 ),
-                style: TextStyle(color: primaryBlue),
+                style: TextStyle(color: textColor), // Usa textColor
               ),
             );
           },
@@ -205,16 +232,16 @@ class _MainUserScreenState extends State<MainUserScreen> {
         Wrap(
           spacing: 8,
           children: [
-            _buildFilterChip('Todo'),
-            _buildFilterChip('Hotel'),
-            _buildFilterChip('Apartamento'),
+            _buildFilterChip('Todo', primaryColor, textColor), // Pasa los colores
+            _buildFilterChip('Hotel', primaryColor, textColor), // Pasa los colores
+            _buildFilterChip('Apartamento', primaryColor, textColor), // Pasa los colores
           ],
         ),
       ],
     );
   }
 
-  Widget _buildFilterChip(String label) {
+  Widget _buildFilterChip(String label, Color primaryColor, Color textColor) {
     bool isSelected = _selectedCategory == label;
     return FilterChip(
       label: Text(label),
@@ -222,45 +249,56 @@ class _MainUserScreenState extends State<MainUserScreen> {
       onSelected: (bool selected) {
         if (selected) _selectCategory(label);
       },
-      selectedColor: primaryBlue,
-      checkmarkColor: Colors.white,
+      selectedColor: primaryColor, // Usa primaryColor
+      checkmarkColor: Theme.of(context).colorScheme.onPrimary, // Color del checkmark basado en el tema
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : primaryBlue,
+        color: isSelected ? Theme.of(context).colorScheme.onPrimary : textColor, // Usa colorScheme.onPrimary para texto seleccionado
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
-      backgroundColor: Colors.grey[100],
-      shape: StadiumBorder(side: BorderSide(color: isSelected ? primaryBlue : Colors.grey[300]!)),
+      backgroundColor: Theme.of(context).secondaryHeaderColor, // Puedes usar secondaryHeaderColor o cardColor
+      shape: StadiumBorder(side: BorderSide(color: isSelected ? primaryColor : Theme.of(context).dividerColor)), // Usa primaryColor y dividerColor
     );
   }
 
-  Widget _buildFeaturedPlaces() {
+  Widget _buildFeaturedPlaces(Color primaryColor, Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Alojamientos Destacados', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryBlue)),
+            Text(
+              'Alojamientos Destacados',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: primaryColor, // Usa primaryColor
+              ),
+            ),
             TextButton(
-              onPressed: () {},
-              child: Text('Ver todos', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                // TODO: Implementar navegación a ver todos los alojamientos
+              },
+              child: Text(
+                'Ver todos',
+                style: TextStyle(color: accentColor, fontWeight: FontWeight.bold), // Usa accentColor
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        _buildStaysList(), // Aquí se llama al método que faltaba
+        _buildStaysList(primaryColor, accentColor), // Pasa los colores
       ],
     );
   }
 
-  // ANOTACIÓN: Aquí está el método que te faltaba.
-  Widget _buildStaysList() {
+  Widget _buildStaysList(Color primaryColor, Color accentColor) {
     return FutureBuilder<List<Stay>>(
       future: _staysFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-        if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No se encontraron alojamientos.'));
+        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Theme.of(context).colorScheme.error))); // Usa color de error del tema
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return Center(child: Text('No se encontraron alojamientos.', style: TextStyle(color: Theme.of(context).textTheme.bodySmall!.color))); // Usa color de texto pequeño del tema
 
         final allStays = snapshot.data!;
         final displayedStays = allStays.where((stay) {
@@ -268,10 +306,15 @@ class _MainUserScreenState extends State<MainUserScreen> {
         }).toList();
 
         if (displayedStays.isEmpty) {
-          return const Center(child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 40.0),
-            child: Text('No hay alojamientos en esta categoría.', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          ));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40.0),
+              child: Text(
+                'No hay alojamientos en esta categoría.',
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall!.color, fontSize: 16), // Usa color de texto pequeño del tema
+              ),
+            ),
+          );
         }
 
         return ListView.builder(
@@ -282,7 +325,7 @@ class _MainUserScreenState extends State<MainUserScreen> {
             final stay = displayedStays[index];
             return GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StayDetailScreen(stay: stay))),
-              child: _buildFeaturedPlaceCard(stay),
+              child: _buildFeaturedPlaceCard(stay, primaryColor, accentColor), // Pasa los colores
             );
           },
         );
@@ -290,12 +333,12 @@ class _MainUserScreenState extends State<MainUserScreen> {
     );
   }
 
-  // ANOTACIÓN: Y este es el widget de la tarjeta que usa el método anterior.
-  Widget _buildFeaturedPlaceCard(Stay stay) {
+  Widget _buildFeaturedPlaceCard(Stay stay, Color primaryColor, Color accentColor) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Theme.of(context).cardColor, // Usa el color de la tarjeta del tema
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -308,8 +351,8 @@ class _MainUserScreenState extends State<MainUserScreen> {
               fit: BoxFit.cover,
               errorBuilder: (context, _, __) => Container(
                 height: 180,
-                color: Colors.grey[200],
-                child: Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
+                color: Theme.of(context).disabledColor.withOpacity(0.3), // Usa el color de widgets deshabilitados
+                child: Icon(Icons.broken_image, size: 50, color: Theme.of(context).iconTheme.color), // Usa el color de icono del tema
               ),
             ),
           ),
@@ -318,24 +361,44 @@ class _MainUserScreenState extends State<MainUserScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(stay.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryBlue)),
+                Text(
+                  stay.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor, // Usa primaryColor
+                      ),
+                ),
                 const SizedBox(height: 4),
-                Text(stay.category, style: const TextStyle(color: Colors.grey)),
+                Text(
+                  stay.category,
+                  style: Theme.of(context).textTheme.bodyMedium, // Usa el estilo de texto del tema
+                ),
                 const SizedBox(height: 8),
                 FutureBuilder<double?>(
                   future: _getMinPriceForStay(stay.stayId!),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2));
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(
+                          height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2));
+                    }
                     if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                       return Text(
+                      return Text(
                         'Consultar precio',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: accentGold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: accentColor, // Usa accentColor
+                        ),
                       );
                     }
                     final price = snapshot.data!;
                     return Text(
                       '\$${price.toStringAsFixed(0)} /noche',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: accentGold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: accentColor, // Usa accentColor
+                      ),
                     );
                   },
                 ),

@@ -1,32 +1,53 @@
 import 'package:aureviarooms/presentation/screens/sign/login_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Importar Provider
-import 'package:aureviarooms/data/models/hotel.dart'; // Asumo que Hotel y HotelService siguen siendo relevantes aquí
-import 'package:aureviarooms/data/services/hotel_service.dart';
-import 'package:aureviarooms/provider/auth_provider.dart'; // Importar AuthProvider
-import 'package:aureviarooms/data/models/user_model.dart'; // Importar UserModel si lo necesitas para tipos
+import 'package:provider/provider.dart';
+import 'package:aureviarooms/provider/auth_provider.dart';
+import 'package:aureviarooms/data/models/user_model.dart';
+import 'package:aureviarooms/provider/theme_provider.dart';
 
 class ProfileOwnerScreen extends StatefulWidget {
-  const ProfileOwnerScreen({super.key}); // Cambiado a const
+  const ProfileOwnerScreen({super.key});
 
   @override
   State<ProfileOwnerScreen> createState() => _ProfileOwnerScreenState();
 }
 
 class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
-  final HotelService _hotelService = HotelService(); // Tu servicio de hoteles
-  // Colores de la marca (azul oscuro y dorado)
-  static const Color primaryBlue = Color(0xFF2A3A5B); // Azul oscuro del logo
-  static const Color accentGold = Color(0xFFD4AF37); // Dorado/Mostaza del logo
-  static const Color textColorLight = Colors.white; // Texto blanco para contraste
+  late TextEditingController _usernameController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+
+  @override
+  void initState() {
+    super.initState();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final UserModel? currentUser = authProvider.appUser;
+
+    _usernameController = TextEditingController(text: currentUser?.username ?? '');
+    _emailController = TextEditingController(text: currentUser?.email ?? '');
+    _phoneController = TextEditingController(text: currentUser?.phoneNumber ?? '');
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar cambios en el AuthProvider
-    final authProvider = Provider.of<AuthProvider>(context);
-    final UserModel? currentUser = authProvider.appUser; // Obtener el UserModel del AuthProvider
+    final Color primaryColor = Theme.of(context).primaryColor;
+    final Color accentColor = Theme.of(context).hintColor;
+    final Color textColor = Theme.of(context).textTheme.bodyLarge!.color!;
+    final Color onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
+    final Color dividerColor = Theme.of(context).dividerColor; // Defined here
 
-    // Si el usuario no está cargado, puedes mostrar un spinner o mensaje
+    final authProvider = Provider.of<AuthProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final UserModel? currentUser = authProvider.appUser;
+
     if (currentUser == null) {
       return Scaffold(
         appBar: AppBar(
@@ -35,10 +56,10 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
             height: 40,
             fit: BoxFit.contain,
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
           elevation: 0,
         ),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
 
@@ -53,42 +74,83 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
             'assets/Logo_Nombre.png',
             height: 40,
             fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => const Text(
+            errorBuilder: (context, error, stackTrace) => Text(
               'AureviaRooms',
-              style: TextStyle(color: Colors.black),
+              style: TextStyle(color: textColor),
             ),
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white, // Color de fondo del AppBar
+          decoration: BoxDecoration(
+            color: Theme.of(context).appBarTheme.backgroundColor,
           ),
         ),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildProfileHeader(currentUser), // Pasar el currentUser
-            const SizedBox(height: 16),
-            _buildFavoritesSection(context),
+            _buildProfileHeader(currentUser, primaryColor, onPrimaryColor),
             const SizedBox(height: 24),
-            _buildProfileSection(context, authProvider), // Pasar authProvider para logout
+            _buildEditableProfileSection(
+              context,
+              authProvider,
+              primaryColor,
+              textColor,
+              dividerColor, // Passed dividerColor
+            ),
+            const SizedBox(height: 20),
+            _buildAppConfigSection(
+              context,
+              themeProvider,
+              primaryColor,
+              textColor,
+              dividerColor, // Passed dividerColor
+              accentColor,
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: Icon(Icons.logout, color: accentColor),
+                label: Text(
+                  'Cerrar Sesión',
+                  style: TextStyle(fontSize: 16, color: accentColor),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor.withOpacity(0.1),
+                  foregroundColor: accentColor,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  await authProvider.logout();
+                  if (!context.mounted) return; // Guard against async gap
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  // Ahora _buildProfileHeader recibe el UserModel
-  Widget _buildProfileHeader(UserModel user) {
-    // Usar la imagen de perfil del usuario si está disponible, de lo contrario un placeholder
+  Widget _buildProfileHeader(UserModel user, Color primaryColor, Color onPrimaryColor) {
     final String profileImageUrl = user.profileImageUrl ??
-        'https://via.placeholder.com/150/0000FF/FFFFFF?text=AU'; // Placeholder si no hay URL
+        'https://via.placeholder.com/150/0000FF/FFFFFF?text=AU';
 
     return Container(
       padding: const EdgeInsets.only(top: 60, bottom: 30),
       decoration: BoxDecoration(
-        color: primaryBlue, // Usar el azul oscuro de tu marca
+        color: primaryColor,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
@@ -101,40 +163,47 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
             children: [
               CircleAvatar(
                 radius: 60,
-                backgroundImage: NetworkImage(profileImageUrl), // Usar URL de imagen real
+                backgroundImage: NetworkImage(profileImageUrl),
                 onBackgroundImageError: (exception, stackTrace) {
-                  // Fallback para errores de carga de imagen
                   debugPrint('Error loading profile image: $exception');
                 },
               ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: textColorLight, // Fondo blanco para el icono de edición
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.edit,
-                  size: 20,
-                  color: primaryBlue, // Icono de edición en azul oscuro
+              GestureDetector(
+                onTap: () {
+                  // TODO: Implementar la lógica para cambiar la imagen de perfil
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Función de cambiar imagen de perfil (TODO)')),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: onPrimaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.edit,
+                    size: 20,
+                    color: primaryColor,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
           Text(
-            user.username, // Mostrar el nombre de usuario real
-            style: const TextStyle(
+            user.username,
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: textColorLight, // Texto en blanco
+              color: onPrimaryColor,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            user.email, // Mostrar el email real
-            style: const TextStyle(
-              color: Colors.white70, // Texto en blanco con opacidad
+            user.email,
+            style: TextStyle(
+              color: onPrimaryColor.withOpacity(0.7),
               fontSize: 16,
             ),
           ),
@@ -143,270 +212,196 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
     );
   }
 
-  // --- EL RESTO DE TUS MÉTODOS DE SECCIÓN NO CAMBIAN MUCHO, EXCEPTO EL LOGOUT ---
-
-  Widget _buildFavoritesSection(BuildContext context) {
-    return FutureBuilder<List<Hotel>>(
-      future: _hotelService.getFeaturedHotels(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: Text('Error al cargar favoritos: ${snapshot.error}')),
-          );
-        }
-
-        final hotels = snapshot.data ?? [];
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hoteles Favoritos', // Traducido
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: primaryBlue, // Usar el color de tu marca
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 220,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: hotels.length,
-                  itemBuilder: (context, index) {
-                    return _buildHotelCard(hotels[index]);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // _buildProfileSection ahora recibe authProvider para el logout
-  Widget _buildProfileSection(BuildContext context, AuthProvider authProvider) {
+  Widget _buildEditableProfileSection(
+    BuildContext context,
+    AuthProvider authProvider,
+    Color primaryColor,
+    Color textColor,
+    Color dividerColor,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          _buildProfileCard(
+      child: _buildProfileCard(
+        context,
+        title: 'Información Personal',
+        options: [
+          _buildEditableProfileField(
             context,
-            title: 'Configuración de Cuenta', // Traducido
-            options: [
-              _buildProfileOption(
-                icon: Icons.person_outline,
-                title: 'Información Personal', // Traducido
-                onTap: () {
-                  // TODO: Implementar navegación a edición de perfil
-                },
-              ),
-              _buildProfileOption(
-                icon: Icons.lock_outline,
-                title: 'Contraseña y Seguridad', // Traducido
-                onTap: () {
-                  // TODO: Implementar navegación a seguridad
-                },
-              ),
-              _buildProfileOption(
-                icon: Icons.notifications_outlined,
-                title: 'Notificaciones', // Traducido
-                onTap: () {
-                  // TODO: Implementar navegación a notificaciones
-                },
-              ),
-            ],
+            icon: Icons.person_outline,
+            label: 'Nombre de Usuario',
+            controller: _usernameController,
+            primaryColor: primaryColor,
+            textColor: textColor,
+            dividerColor: dividerColor, // Pass dividerColor
           ),
-          const SizedBox(height: 20),
-          _buildProfileCard(
+          // Email field is usually not editable via app, but displayed
+          _buildEditableProfileField(
             context,
-            title: 'Configuración de la Aplicación', // Traducido
-            options: [
-              _buildProfileOption(
-                icon: Icons.language_outlined,
-                title: 'Idioma', // Traducido
-                onTap: () {},
-                trailing: const Text('Español'), // Mostrar idioma actual
-              ),
-              _buildProfileOption(
-                icon: Icons.dark_mode_outlined,
-                title: 'Modo Oscuro', // Traducido
-                onTap: () {
-                  // TODO: Implementar lógica de cambio de tema
+            icon: Icons.email_outlined,
+            label: 'Email',
+            controller: _emailController,
+            primaryColor: primaryColor,
+            textColor: textColor,
+            dividerColor: dividerColor, // Pass dividerColor
+            keyboardType: TextInputType.emailAddress,
+            readOnly: true, // Make email read-only as it's often managed by auth provider
+          ),
+          _buildEditableProfileField(
+            context,
+            icon: Icons.phone_outlined,
+            label: 'Número de Teléfono',
+            controller: _phoneController,
+            primaryColor: primaryColor,
+            textColor: textColor,
+            dividerColor: dividerColor, // Pass dividerColor
+            keyboardType: TextInputType.phone,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (!mounted) return; // Guard against async gap
+
+                  final currentUser = authProvider.appUser;
+                  if (currentUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error: No se encontró la información del usuario.')),
+                    );
+                    return;
+                  }
+
+                  // Create a new UserModel with updated data, using existing non-editable fields
+                  final updatedUser = UserModel(
+                    authUserId: currentUser.authUserId,
+                    username: _usernameController.text,
+                    email: currentUser.email, // Use current email, as it's read-only
+                    userType: currentUser.userType, // Use current userType
+                    createdAt: currentUser.createdAt,
+                    profileImageUrl: currentUser.profileImageUrl,
+                    phoneNumber: _phoneController.text,
+                  );
+
+                  try {
+                    // Use authProvider.setUser to update the profile
+                    await authProvider.setUser(updatedUser);
+                    if (!mounted) return; // Guard against async gap
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Perfil actualizado exitosamente!')),
+                    );
+                  } catch (e) {
+                    if (!mounted) return; // Guard against async gap
+                    debugPrint('Error al actualizar perfil: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al actualizar perfil: ${e.toString()}')),
+                    );
+                  }
                 },
-                trailing: Switch(
-                  value: false, // Valor real del modo oscuro
-                  onChanged: (val) {
-                    // TODO: Implementar cambio de modo oscuro
-                  },
-                  activeColor: accentGold, // Color activo del switch en dorado
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
+                child: const Text('Guardar Cambios'),
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildProfileCard(
-            context,
-            title: 'Soporte', // Traducido
-            options: [
-              _buildProfileOption(
-                icon: Icons.help_outline,
-                title: 'Centro de Ayuda', // Traducido
-                onTap: () {
-                  // TODO: Implementar navegación a centro de ayuda
-                },
-              ),
-              _buildProfileOption(
-                icon: Icons.info_outline,
-                title: 'Acerca de la Aplicación', // Traducido
-                onTap: () {
-                  // TODO: Implementar navegación a información de la app
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.logout),
-              label: const Text(
-                'Cerrar Sesión', // Traducido
-                style: TextStyle(fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentGold.withOpacity(0.1), // Fondo más suave con dorado
-                foregroundColor: accentGold, // Texto en dorado
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                // Acción de logout
-                await authProvider.logout();
-                if (!context.mounted) return;
-                // Después de logout, UserTypeGate redirigirá a LoginScreen
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()), // O UserTypeGate si quieres que decida
-                  (route) => false,
-                );
-              },
             ),
           ),
-          const SizedBox(height: 30),
         ],
+        primaryColor: primaryColor,
+        textColor: textColor,
+        dividerColor: dividerColor,
       ),
     );
   }
 
-  Widget _buildHotelCard(Hotel hotel) {
-    // Tu método _buildHotelCard sin cambios significativos en la lógica
-    return Container(
-      width: 180,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+  Widget _buildEditableProfileField(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required TextEditingController controller,
+    required Color primaryColor,
+    required Color textColor,
+    required Color dividerColor, // dividerColor is now correctly passed
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false, // Added a readOnly parameter
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: TextStyle(color: textColor),
+        readOnly: readOnly, // Apply readOnly property
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
+          prefixIcon: Icon(icon, color: primaryColor),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: dividerColor),
           ),
-        ],
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: primaryColor, width: 2),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: dividerColor),
+          ),
+          // If readOnly, make it look less like an input field
+          filled: readOnly,
+          fillColor: readOnly ? Theme.of(context).disabledColor.withOpacity(0.1) : null,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Image.network(
-              hotel.imageUrl,
-              height: 120,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 120,
-                color: Colors.grey[300],
-                child: const Icon(Icons.hotel, size: 50, color: Colors.grey),
-              ),
-            ),
+    );
+  }
+
+  Widget _buildAppConfigSection(
+    BuildContext context,
+    ThemeProvider themeProvider,
+    Color primaryColor,
+    Color textColor,
+    Color dividerColor,
+    Color accentColor,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: _buildProfileCard(
+        context,
+        title: 'Configuración de la Aplicación',
+        options: [
+          _buildProfileOption(
+            context: context,
+            icon: Icons.language_outlined,
+            title: 'Idioma',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Cambio de idioma (TODO)')),
+              );
+            },
+            trailing: Text('Español', style: TextStyle(color: textColor.withOpacity(0.7))),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hotel.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        hotel.location,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.star, size: 16, color: Colors.amber),
-                        const SizedBox(width: 4),
-                        Text(
-                          hotel.rating.toString(),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '\$${hotel.pricePerNight.toStringAsFixed(0)}/night',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: primaryBlue, // Usar el azul de tu marca
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          _buildProfileOption(
+            context: context,
+            icon: Icons.dark_mode_outlined,
+            title: 'Modo Oscuro',
+            onTap: () {
+              themeProvider.toggleTheme();
+            },
+            trailing: Switch(
+              value: themeProvider.isDarkMode,
+              onChanged: (val) {
+                themeProvider.toggleTheme();
+              },
+              activeColor: accentColor,
             ),
           ),
         ],
+        primaryColor: primaryColor,
+        textColor: textColor,
+        dividerColor: dividerColor,
       ),
     );
   }
@@ -415,9 +410,13 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
     BuildContext context, {
     required String title,
     required List<Widget> options,
+    required Color primaryColor,
+    required Color textColor,
+    required Color dividerColor,
   }) {
     return Card(
       elevation: 0,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -432,11 +431,11 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: primaryBlue, // Usar el azul de tu marca para títulos de sección
+                      color: primaryColor,
                     ),
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: dividerColor),
             ...options,
           ],
         ),
@@ -445,15 +444,16 @@ class _ProfileOwnerScreenState extends State<ProfileOwnerScreen> {
   }
 
   Widget _buildProfileOption({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required VoidCallback onTap,
     Widget? trailing,
   }) {
     return ListTile(
-      leading: Icon(icon, color: primaryBlue), // Iconos de opción en azul oscuro
-      title: Text(title),
-      trailing: trailing ?? const Icon(Icons.chevron_right, size: 20, color: primaryBlue), // Flecha en azul oscuro
+      leading: Icon(icon, color: Theme.of(context).iconTheme.color),
+      title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
+      trailing: trailing ?? Icon(Icons.chevron_right, size: 20, color: Theme.of(context).iconTheme.color),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       minLeadingWidth: 24,
       onTap: onTap,

@@ -18,11 +18,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final HotelService _hotelService = HotelService();
 
-  // Elimina las definiciones de colores estáticos aquí, ahora vienen del tema
-  // static const Color primaryBlue = Color(0xFF2A3A5B);
-  // static const Color accentGold = Color(0xFFD4AF37);
-  // static const Color textColorLight = Colors.white;
-
   @override
   Widget build(BuildContext context) {
     // Accede a ambos proveedores
@@ -235,13 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 },
               ),
-              _buildProfileOption(
-                icon: Icons.lock_outline,
-                title: 'Contraseña y Seguridad',
-                onTap: () {
-                  // TODO: Implementar navegación a seguridad
-                },
-              ),
+              // Removed the "Contraseña y Seguridad" option
               _buildProfileOption(
                 icon: Icons.notifications_outlined,
                 title: 'Notificaciones',
